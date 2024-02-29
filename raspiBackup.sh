@@ -4794,7 +4794,6 @@ function cleanupStartup() { # trap
 
 	cleanupTempFiles
 
-
 	logFinish
 
 	if (( $LOG_LEVEL == $LOG_DEBUG )); then
@@ -4859,7 +4858,6 @@ function cleanup() { # trap
 	finalCommand "$rc"
 
 	logItem "Terminate now with rc $CLEANUP_RC"
-	(( $CLEANUP_RC == 0 )) && saveVars
 
 	if (( $rc != 0 )); then
 		if (( ! $MAIL_ON_ERROR_ONLY )); then
@@ -4952,6 +4950,8 @@ function cleanup() { # trap
 	fi
 
 	logFinish
+
+	saveVars
 
 	callNotificationExtension $rc
 
@@ -5878,11 +5878,12 @@ function restore() {
 				rc=$?
 				if (( $rc )); then
 					if (( $rc == 1 )); then
-						cp "$SF_FILE" "/tmp/$SF_FILE"
-						sed -i 's/sector-size/d' "/tmp/$SF_FILE"
-						sfdisk -f "$RESTORE_DEVICE" < "/tmp/$SF_FILE" &>>"$LOG_FILE"
+						local tmpSF="$(basename $SF_FILE)"
+						cp "$SF_FILE" "/tmp/$tmpSF"
+						sed -i 's/sector-size/d' "/tmp/$tmpSF"
+						sfdisk -f "$RESTORE_DEVICE" < "/tmp/$tmpSF" &>>"$LOG_FILE"
 						rc=$?
-						rm "/tmp/$SF_FILE"
+						rm "/tmp/$tmpSF"
 					fi
 				fi
 				if (( $rc )); then
@@ -9123,7 +9124,7 @@ if (( $# == 1 )); then
 	fi
 fi
 
-if (( $UID != 0 )); then
+if (( $UID != 0 && ! INCLUDE_ONLY )); then
 	LOG_LEVEL=$LOG_NONE
 	writeToConsole $MSG_LEVEL_MINIMAL $MSG_RUNASROOT "$0" "$INVOCATIONPARMS"
 	exitError $RC_MISC_ERROR
