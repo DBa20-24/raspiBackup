@@ -231,6 +231,8 @@ declare -A FILE_EXTENSION=( [$BACKUPTYPE_DD]=".img" [$BACKUPTYPE_DDZ]=".img.gz" 
 # map dd/tar to ddz/tgz extension if -z switch is used
 declare -A Z_TYPE_MAPPING=( [$BACKUPTYPE_DD]=$BACKUPTYPE_DDZ [$BACKUPTYPE_TAR]=$BACKUPTYPE_TGZ )
 
+BACKUPTYPE_CLONE="clone"
+
 readarray -t SORTED < <(for a in "${!FILE_EXTENSION[@]}"; do echo "$a"; done | sort)
 ALLOWED_TYPES=""
 POSSIBLE_TYPES=""
@@ -327,6 +329,10 @@ SUPPORTED_EMAIL_COLORING=$(echo $SUPPORTED_EMAIL_COLORING_REGEX | sed 's:^..\(.*
 
 PARTITIONS_TO_BACKUP_ALL="*"
 MASQUERADE_STRING="@@@@"
+
+CLONE_INITIAL="I"
+CLONE_SYNC="S"
+CLONE_VALID_OPTIONS="$CLONE_INITIAL$CLONE_SYNC"
 
 COLORING_OFF=""
 COLORING_CONSOLE="C"
@@ -1832,7 +1838,7 @@ MSG_FI[$MSG_NO_FILEATTRIBUTE_RIGHTS]="RBK0266E: Käyttöoikeudet tiedostoattribu
 MSG_FR[$MSG_NO_FILEATTRIBUTE_RIGHTS]="RBK0266E: Droits d'accès manquants pour créer des attributs de fichier sur %s (système de fichiers : %s)."
 
 #
-# Non NLS messages
+# Non NLS translated messages
 #
 
 MSG_EXTENSION_CALLED=267
@@ -1931,6 +1937,12 @@ MSG_DE[$MSG_SYNC_CMDLINE_FSTAB]="RBK0295I: %s und %s werden synchronisiert."
 OVERLAY_FILESYSTEM_NOT_SUPPORTED=296
 MSG_EN[$OVERLAY_FILESYSTEM_NOT_SUPPORTED]="RBK0296E: Overlay filesystem is not supported."
 MSG_DE[$OVERLAY_FILESYSTEM_NOT_SUPPORTED]="RBK0296E: Overlayfilesystem wird nicht unterstützt."
+MSG_INVALID_CLONE_OPTION=297
+MSG_EN[$MSG_INVALID_CLONE_OPTION]="RBK0297E: Invalid clone option %s detected."
+MSG_DE[$MSG_INVALID_CLONE_OPTION]="RBK0297E: Ungültige Cloneoption %s entdeckt."
+MSG_MISSING_CLONEDEVICE_OPTION=298
+MSG_EN[$MSG_MISSING_CLONEDEVICE_OPTION]="RBK0299E: Option --clone requires also option -d."
+MSG_DE[$MSG_MISSING_CLONEDEVICE_OPTION]="RBK0298E: Option --clone benötigt auch Option -d."
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -2670,6 +2682,8 @@ function logOptions() { # option state
 	logItem "BEFORE_STOPSERVICES=$BEFORE_STOPSERVICES"
 	logItem "BOOT_DEVICE=$BOOT_DEVICE"
 	logItem "CHECK_FOR_BAD_BLOCKS=$CHECK_FOR_BAD_BLOCKS"
+	logItem "CLONE=$CLONE"
+	logItem "CLONE_INIT=$CLONE_INIT"
 	logItem "COLOR_CODES="${COLOR_CODES[@]}""
  	logItem "COLORING=$COLORING"
  	logItem "CONFIG_FILE=$CONFIG_FILE"
@@ -2858,6 +2872,8 @@ function initializeDefaultConfigVariables() {
 	DEFAULT_SMART_RECYCLE_OPTIONS="7 4 12 1"
 	# Check for back blocks when formating restore device (Will take a long time)
 	DEFAULT_CHECK_FOR_BAD_BLOCKS=0
+	# Clone system
+	CLONE=""
 	# Resize root filesystem during restore
 	DEFAULT_RESIZE_ROOTFS=1
 	# add timestamps in front of messages
@@ -2919,6 +2935,7 @@ function copyDefaultConfigVariables() {
 	AFTER_STARTSERVICES="$DEFAULT_AFTER_STARTSERVICES"
 	BEFORE_STOPSERVICES="$DEFAULT_BEFORE_STOPSERVICES"
 	CHECK_FOR_BAD_BLOCKS="$DEFAULT_CHECK_FOR_BAD_BLOCKS"
+	CLONE="$CLONE"
 	COLOR_CODES=("${DEFAULT_COLOR_CODES[0]}" "${DEFAULT_COLOR_CODES[1]}")
 	COLORING="$DEFAULT_COLORING"
 	DD_BACKUP_SAVE_USED_PARTITIONS_ONLY="$DEFAULT_DD_BACKUP_SAVE_USED_PARTITIONS_ONLY"
@@ -5677,6 +5694,91 @@ function backupRsync() { # partition number (for partition based backup)
 
 }
 
+function backupClone() { 
+
+	local verbose target source excludeRoot cmd cmdParms excludeMeta
+
+	logEntry
+
+	(( $PROGRESS )) && VERBOSE=0
+
+	verbose="--info=NAME0"
+	(( $VERBOSE )) && verbose="-v"
+
+	target="\"${BACKUPTARGET_DIR}\""
+	source="/"
+
+	if [[ $CLONE_INITIAL ]]; then
+		initCloneDevice
+	fi
+
+	bootPartitionClone	
+	rootPartitionClone
+	synchronizeCmdlineAndfstab
+
+	logExit  "$rc"
+
+}
+
+function initCloneDevice() {
+
+	logEntry
+
+	sfdisk -d $BOOT_DEVICENAME > "$MODIFIED_SFDISK" 2>>$LOG_FILE
+
+	logCommand "cat $MODIFIED_SFDISK"
+
+	local sourceSDSize=$(calcSumSizeFromSFDISK "$MODIFIED_SFDISK")
+	local targetSDSize=$(blockdev --getsize64 $RESTORE_DEVICE)
+	logItem "sourceSDSize: $sourceSDSize - targetSDSize: $targetSDSize"
+
+	if (( sourceSDSize != targetSDSize )); then
+
+		local sourceValues=( $(awk '/(1|2) :/ { v=$4 $6; gsub(","," ",v); printf "%s",v }' "$MODIFIED_SFDISK") )
+		if [[ ${#sourceValues[@]} != 4 ]]; then
+			assertionFailed $LINENO "Expected at least 2 partitions in $MODIFIED_SFDISK"
+		fi
+
+		local adjustedTargetPartitionBlockSize=$(( $targetSDSize / 512 - ${sourceValues[1]} - ${sourceValues[0]} - ( ${sourceValues[2]} - ${sourceValues[1]} ) ))
+		logItem "sourceSDSize: $sourceSDSize - targetSDSize: $targetSDSize"
+		logItem "sourceBlockSize: ${sourceValues[3]} - adjusted targetBlockSize: $adjustedTargetPartitionBlockSize"
+
+		local newTargetPartitionSize=$(( adjustedTargetPartitionBlockSize * 512 ))
+		local oldPartitionSourceSize=$(( ${sourceValues[3]} * 512 ))
+
+		sed -i "/2 :/ s/${sourceValues[3]}/$adjustedTargetPartitionBlockSize/" $MODIFIED_SFDISK
+
+		logItem "Updated sfdisk file"
+		logCommand "cat $MODIFIED_SFDISK"
+
+		if [[ "$(bytesToHuman $oldPartitionSourceSize)" != "$(bytesToHuman $newTargetPartitionSize)" ]]; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_SECOND "$(bytesToHuman $oldPartitionSourceSize)" "$(bytesToHuman $newTargetPartitionSize)"
+		fi
+	fi
+
+	sfdisk -f $RESTORE_DEVICE < "$MODIFIED_SFDISK" &>>"$LOG_FILE"
+	rc=$?
+	if (( $rc )); then
+		logItem "sfdisk first attempt fails with rc $rc"
+		if (( $rc == 1 )); then								# sector-size is new in bullseye and breaks restore with older OS
+			sed -i '/sector-size/d' "$MODIFIED_SFDISK"		# remove sector-size
+			logCommand "cat $MODIFIED_SFDISK"
+			sfdisk -f $RESTORE_DEVICE < "$MODIFIED_SFDISK" &>>"$LOG_FILE"
+			rc=$?
+		fi
+	fi
+	rm $MODIFIED_SFDISK &>/dev/null
+
+	if (( $rc )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_PARTITIONS $rc "sfdisk error"
+		exitError $RC_CREATE_PARTITIONS_FAILED
+	fi
+
+	waitForPartitionDefsChanged
+
+	logExit
+}
+
 function areDevicesUnique() {
 
 	logEntry
@@ -6207,17 +6309,22 @@ function backup() {
 		exitError $RC_BACKUP_EXTENSION_FAILS
 	fi
 
-	if [[ $BACKUPTYPE == $BACKUPTYPE_RSYNC || (( $PARTITIONBASED_BACKUP )) ]]; then
-		writeToConsole $MSG_LEVEL_DETAILED $MSG_BACKUP_TARGET "$BACKUPTYPE" "$BACKUPTARGET_DIR"
-	else
-		writeToConsole $MSG_LEVEL_DETAILED $MSG_BACKUP_TARGET "$BACKUPTYPE" "$BACKUPTARGET_FILE"
+	if [[ -z $CLONE ]]; then
+
+		if [[ $BACKUPTYPE == $BACKUPTYPE_RSYNC || (( $PARTITIONBASED_BACKUP )) ]]; then
+			writeToConsole $MSG_LEVEL_DETAILED $MSG_BACKUP_TARGET "$BACKUPTYPE" "$BACKUPTARGET_DIR"
+		else
+			writeToConsole $MSG_LEVEL_DETAILED $MSG_BACKUP_TARGET "$BACKUPTYPE" "$BACKUPTARGET_FILE"
+		fi
+
+		logItem "Storing backup in backuppath $BACKUPPATH"
 	fi
-
-	logItem "Storing backup in backuppath $BACKUPPATH"
-
+	
 	if [[ -f $BOOT_DEVICENAME ]]; then
 		logCommand "fdisk -l $BOOT_DEVICENAME"
 	fi
+
+	[[ -n $CLONE ]] && BACKUPTYPE=$BACKUPTYPE_CLONE;
 
 	logItem "Starting $BACKUPTYPE backup..."
 
@@ -6240,6 +6347,9 @@ function backup() {
 						;;
 
 					$BACKUPTYPE_RSYNC) backupRsync
+						;;
+
+					$BACKUPTYPE_CLONE) backupClone
 						;;
 
 					*) assertionFailed $LINENO "Invalid backuptype $BACKUPTYPE"
@@ -6644,6 +6754,12 @@ function commonChecks() {
 			exitError $RC_PARAMETER_ERROR
 	fi
 
+	local cl="$(tr -d "$CLONE_VALID_OPTIONS" <<< $CLONE)"
+	if [[ -n "$CLONE" && -n "$cl" ]]; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_INVALID_CLONE_OPTION "$cl"
+			exitError $RC_PARAMETER_ERROR
+	fi
+
 	logExit
 
 }
@@ -6904,101 +7020,104 @@ function doitBackup() {
 
 	commonChecks
 
-	if hasSpaces "$BACKUPPATH"; then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_FILE_CONTAINS_SPACES "$BACKUPPATH"
-		exitError $RC_MISC_ERROR
-	fi
+	if [[ -z $CLONE ]]; then
 
-	if [[ ! -d "$BACKUPPATH" ]]; then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_DIR_TO_BACKUP_DOESNOTEXIST "$BACKUPPATH"
-		exitError $RC_MISSING_FILES
-	fi
-
-	if [[ $(getFsType "$BACKUPPATH") == "vfat" ]]; then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MAX_4GB_LIMIT "$BACKUPPATH"
-	fi
-
-	if (( ! $EXCLUDE_DD )); then
-
-		if [[ ! -b $BOOT_DEVICENAME ]]; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_SDCARD_FOUND $BOOT_DEVICENAME
-			exitError $RC_PARAMETER_ERROR
+		if hasSpaces "$BACKUPPATH"; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_FILE_CONTAINS_SPACES "$BACKUPPATH"
+			exitError $RC_MISC_ERROR
 		fi
 
-		if ! fdisk -l $BOOT_DEVICENAME | grep "${BOOT_PARTITION_PREFIX}1" > /dev/null; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_BOOT_PARTITION
-			exitError $RC_SDCARD_ERROR
+		if [[ ! -d "$BACKUPPATH" ]]; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_DIR_TO_BACKUP_DOESNOTEXIST "$BACKUPPATH"
+			exitError $RC_MISSING_FILES
 		fi
 
-		local partitionsFound=$(fdisk -l $BOOT_DEVICENAME | grep "^/dev/$BOOT_PARTITION_PREFIX" | wc -l)
-		logItem "Found partitions on $BOOT_DEVICENAME: $partitionsFound"
-		if [[ (( $partitionsFound > 2 )) && ( "$BACKUPTYPE" != "$BACKUPTYPE_DD" && "$BACKUPTYPE" != "$BACKUPTYPE_DDZ" ) ]]; then
-			if ! (( $PARTITIONBASED_BACKUP || $IGNORE_ADDITIONAL_PARTITIONS )); then
-				writeToConsole $MSG_LEVEL_MINIMAL $MSG_MULTIPLE_PARTITIONS_FOUND
+		if [[ $(getFsType "$BACKUPPATH") == "vfat" ]]; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_MAX_4GB_LIMIT "$BACKUPPATH"
+		fi
+
+		if (( ! $EXCLUDE_DD )); then
+
+			if [[ ! -b $BOOT_DEVICENAME ]]; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_SDCARD_FOUND $BOOT_DEVICENAME
+				exitError $RC_PARAMETER_ERROR
+			fi
+
+			if ! fdisk -l $BOOT_DEVICENAME | grep "${BOOT_PARTITION_PREFIX}1" > /dev/null; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_BOOT_PARTITION
 				exitError $RC_SDCARD_ERROR
 			fi
-			if (( $IGNORE_ADDITIONAL_PARTITIONS && ! $PARTITIONBASED_BACKUP )); then
-				writeToConsole $MSG_LEVEL_MINIMAL $MSG_MULTIPLE_PARTITIONS_FOUND_BUT_2_PARTITIONS_SAVED_ONLY
+
+			local partitionsFound=$(fdisk -l $BOOT_DEVICENAME | grep "^/dev/$BOOT_PARTITION_PREFIX" | wc -l)
+			logItem "Found partitions on $BOOT_DEVICENAME: $partitionsFound"
+			if [[ (( $partitionsFound > 2 )) && ( "$BACKUPTYPE" != "$BACKUPTYPE_DD" && "$BACKUPTYPE" != "$BACKUPTYPE_DDZ" ) ]]; then
+				if ! (( $PARTITIONBASED_BACKUP || $IGNORE_ADDITIONAL_PARTITIONS )); then
+					writeToConsole $MSG_LEVEL_MINIMAL $MSG_MULTIPLE_PARTITIONS_FOUND
+					exitError $RC_SDCARD_ERROR
+				fi
+				if (( $IGNORE_ADDITIONAL_PARTITIONS && ! $PARTITIONBASED_BACKUP )); then
+					writeToConsole $MSG_LEVEL_MINIMAL $MSG_MULTIPLE_PARTITIONS_FOUND_BUT_2_PARTITIONS_SAVED_ONLY
+				fi
 			fi
 		fi
-	fi
 
-	if [[ ! "$KEEPBACKUPS" =~ ^-?[0-9]+$ ]] || (( $KEEPBACKUPS < -1 || $KEEPBACKUPS > 365 || $KEEPBACKUPS == 0 )); then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_KEEPBACKUP_INVALID "$KEEPBACKUPS" "-k"
-			mentionHelp
-			exitError $RC_PARAMETER_ERROR
-	fi
-
-	local t
-	local keepBackups
-	for t in "${POSSIBLE_TYPES_ARRAY[@]}"; do
-		local bt="${t^^}"
-		local v="KEEPBACKUPS_${bt}"
-		local keepOverwrite="${!v}"
-
-		if [[ ! $keepOverwrite =~ ^-?[0-9]+$ ]] || (( $keepOverwrite < -1 || $keepOverwrite > 365 )); then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_KEEPBACKUP_INVALID "$keepOverwrite" "$v"
-			mentionHelp
-			exitError $RC_PARAMETER_ERROR
-		fi
-	done
-
-	if (( $SMART_RECYCLE )); then
-		if [[ ! "$SMART_RECYCLE_OPTIONS" =~ ^[0-9]+[[:space:]]*+[0-9]+[[:space:]]+[0-9]+[[:space:]]+[0-9]+$ ]]; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_SMART_RECYCLE_PARM_INVALID "" "$SMART_RECYCLE_OPTIONS"
-			mentionHelp
-			exitError $RC_PARAMETER_ERROR
+		if [[ ! "$KEEPBACKUPS" =~ ^-?[0-9]+$ ]] || (( $KEEPBACKUPS < -1 || $KEEPBACKUPS > 365 || $KEEPBACKUPS == 0 )); then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_KEEPBACKUP_INVALID "$KEEPBACKUPS" "-k"
+				mentionHelp
+				exitError $RC_PARAMETER_ERROR
 		fi
 
-		eval "SMART_RECYCLE_PARMS=( $SMART_RECYCLE_OPTIONS )"
-		local p="${SMART_RECYCLE_PARMS[@]}"
-		logItem "SMART_RECYCLE_PARMS: $p"
-		logItem "smart recycle parms: ${#SMART_RECYCLE_PARMS[@]}"
+		local t
+		local keepBackups
+		for t in "${POSSIBLE_TYPES_ARRAY[@]}"; do
+			local bt="${t^^}"
+			local v="KEEPBACKUPS_${bt}"
+			local keepOverwrite="${!v}"
 
-		local sb
+			if [[ ! $keepOverwrite =~ ^-?[0-9]+$ ]] || (( $keepOverwrite < -1 || $keepOverwrite > 365 )); then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_KEEPBACKUP_INVALID "$keepOverwrite" "$v"
+				mentionHelp
+				exitError $RC_PARAMETER_ERROR
+			fi
+		done
+
 		if (( $SMART_RECYCLE )); then
-			for sb in "${SMART_RECYCLE_PARMS[@]}"; do
-				if (( $sb > 365 )); then
-					writeToConsole $MSG_LEVEL_MINIMAL $MSG_SMART_RECYCLE_PARM_INVALID "$sb" "$SMART_RECYCLE_OPTIONS"
-					mentionHelp
-					exitError $RC_PARAMETER_ERROR
-				fi
-			done
+			if [[ ! "$SMART_RECYCLE_OPTIONS" =~ ^[0-9]+[[:space:]]*+[0-9]+[[:space:]]+[0-9]+[[:space:]]+[0-9]+$ ]]; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_SMART_RECYCLE_PARM_INVALID "" "$SMART_RECYCLE_OPTIONS"
+				mentionHelp
+				exitError $RC_PARAMETER_ERROR
+			fi
+
+			eval "SMART_RECYCLE_PARMS=( $SMART_RECYCLE_OPTIONS )"
+			local p="${SMART_RECYCLE_PARMS[@]}"
+			logItem "SMART_RECYCLE_PARMS: $p"
+			logItem "smart recycle parms: ${#SMART_RECYCLE_PARMS[@]}"
+
+			local sb
+			if (( $SMART_RECYCLE )); then
+				for sb in "${SMART_RECYCLE_PARMS[@]}"; do
+					if (( $sb > 365 )); then
+						writeToConsole $MSG_LEVEL_MINIMAL $MSG_SMART_RECYCLE_PARM_INVALID "$sb" "$SMART_RECYCLE_OPTIONS"
+						mentionHelp
+						exitError $RC_PARAMETER_ERROR
+					fi
+				done
+			fi
+		fi
+
+		if (( $ZIP_BACKUP_TYPE_INVALID )); then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNKNOWN_BACKUPTYPE_FOR_ZIP $BACKUPTYPE
+			mentionHelp
+			exitError $RC_PARAMETER_ERROR
+		fi
+
+		if [[ ! $BACKUPTYPE =~ ^(${POSSIBLE_TYPES})$ ]]; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNKNOWN_BACKUPTYPE $BACKUPTYPE
+			mentionHelp
+			exitError $RC_PARAMETER_ERROR
 		fi
 	fi
-
-	if (( $ZIP_BACKUP_TYPE_INVALID )); then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNKNOWN_BACKUPTYPE_FOR_ZIP $BACKUPTYPE
-		mentionHelp
-		exitError $RC_PARAMETER_ERROR
-	fi
-
-	if [[ ! $BACKUPTYPE =~ ^(${POSSIBLE_TYPES})$ ]]; then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNKNOWN_BACKUPTYPE $BACKUPTYPE
-		mentionHelp
-		exitError $RC_PARAMETER_ERROR
-	fi
-
+	
 	if [[ -n "$TELEGRAM_CHATID" && -z "$TELEGRAM_TOKEN" ]] || [[ -z "$TELEGRAM_CHATID" && -n "$TELEGRAM_TOKEN" ]]; then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_TELEGRAM_OPTIONS_INCOMPLETE
 		exitError $RC_PARAMETER_ERROR
@@ -7041,44 +7160,47 @@ function doitBackup() {
 		fi
 	fi
 
-	if [[ "$BACKUPTYPE" == "$BACKUPTYPE_DD" || "$BACKUPTYPE" == "$BACKUPTYPE_DDZ" ]]; then
-		(( $DD_WARNING )) && writeToConsole $MSG_LEVEL_MINIMAL $MSG_DD_WARNING
-	fi
+	if [[ -z $CLONE ]]; then
 
-	if [[ "$BACKUPTYPE" == "$BACKUPTYPE_RSYNC" ]]; then
-		if ! which rsync &>/dev/null; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_INSTALLED_FILE "rsync" "rsync"
-			exitError $RC_MISSING_COMMANDS
+		if [[ "$BACKUPTYPE" == "$BACKUPTYPE_DD" || "$BACKUPTYPE" == "$BACKUPTYPE_DDZ" ]]; then
+			(( $DD_WARNING )) && writeToConsole $MSG_LEVEL_MINIMAL $MSG_DD_WARNING
 		fi
 
-		if ! supportsHardlinks "$BACKUPPATH"; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_HARDLINK_ERROR "$BACKUPPATH" "$RC_MISC_ERROR"
-			exitError $RC_MISC_ERROR
-		else
-			local fs="$(getFsType "$BACKUPPATH")"
-			logItem "Filesystem: $fs"
-			if ! supportsFileAttributes $BACKUPPATH; then
-				if [[ $fs =~ ^nfs* ]]; then
-					writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_FILEATTRIBUTE_RIGHTS "$(findMountPath "$BACKUPPATH")" "$fs"
-				else
-					writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_FILEATTRIBUTESUPPORT "$fs" "$(findMountPath "$BACKUPPATH")"
-				fi
+		if [[ "$BACKUPTYPE" == "$BACKUPTYPE_RSYNC" ]]; then
+			if ! which rsync &>/dev/null; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_INSTALLED_FILE "rsync" "rsync"
+				exitError $RC_MISSING_COMMANDS
+			fi
+
+			if ! supportsHardlinks "$BACKUPPATH"; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_HARDLINK_ERROR "$BACKUPPATH" "$RC_MISC_ERROR"
 				exitError $RC_MISC_ERROR
+			else
+				local fs="$(getFsType "$BACKUPPATH")"
+				logItem "Filesystem: $fs"
+				if ! supportsFileAttributes $BACKUPPATH; then
+					if [[ $fs =~ ^nfs* ]]; then
+						writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_FILEATTRIBUTE_RIGHTS "$(findMountPath "$BACKUPPATH")" "$fs"
+					else
+						writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_FILEATTRIBUTESUPPORT "$fs" "$(findMountPath "$BACKUPPATH")"
+					fi
+					exitError $RC_MISC_ERROR
+				fi
+			fi
+			if ! supportsSymlinks "$BACKUPPATH"; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_FILESYSTEM_INCORRECT "$BACKUPPATH" "softlinks"
+				exitError $RC_PARAMETER_ERROR
+			fi
+
+			local rsyncVersion=$(rsync --version | head -n 1 | awk '{ print $3 }')
+			logItem "rsync version: $rsyncVersion"
+			if (( $PROGRESS && $INTERACTIVE )) && [[ "$rsyncVersion" < "3.1" ]]; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_RSYNC_DOES_NOT_SUPPORT_PROGRESS "$rsyncVersion"
+				exitError $RC_PARAMETER_ERROR
 			fi
 		fi
-		if ! supportsSymlinks "$BACKUPPATH"; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_FILESYSTEM_INCORRECT "$BACKUPPATH" "softlinks"
-			exitError $RC_PARAMETER_ERROR
-		fi
-
-		local rsyncVersion=$(rsync --version | head -n 1 | awk '{ print $3 }')
-		logItem "rsync version: $rsyncVersion"
-		if (( $PROGRESS && $INTERACTIVE )) && [[ "$rsyncVersion" < "3.1" ]]; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_RSYNC_DOES_NOT_SUPPORT_PROGRESS "$rsyncVersion"
-			exitError $RC_PARAMETER_ERROR
-		fi
 	fi
-
+	
 	if [[ -z "$STARTSERVICES" && -z "$STOPSERVICES" ]]; then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_START_STOP
 		exitError $RC_PARAMETER_ERROR
@@ -7104,28 +7226,30 @@ function doitBackup() {
 		fi
 	fi
 
-	if (( $PARTITIONBASED_BACKUP )); then
-		if [[ $BACKUPTYPE == $BACKUPTYPE_DD || $BACKUPTYPE == $BACKUPTYPE_DDZ ]]; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_DD_BACKUP_NOT_POSSIBLE_FOR_PARTITIONBASED_BACKUP
-			exitError $RC_PARAMETER_ERROR
+	if [[ -z $CLONE ]]; then
+		if (( $PARTITIONBASED_BACKUP )); then
+			if [[ $BACKUPTYPE == $BACKUPTYPE_DD || $BACKUPTYPE == $BACKUPTYPE_DDZ ]]; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_DD_BACKUP_NOT_POSSIBLE_FOR_PARTITIONBASED_BACKUP
+				exitError $RC_PARAMETER_ERROR
+			fi
+			if (( ! $FAKE )); then
+				checksForPartitionBasedBackup
+			fi
 		fi
-		if (( ! $FAKE )); then
-			checksForPartitionBasedBackup
+
+		if (( $LINK_BOOTPARTITIONFILES )) &&  [[ "$BACKUPTYPE" != "$BACKUPTYPE_DD" ]] && [[ "$BACKUPTYPE" != "$BACKUPTYPE_DDZ" ]]; then
+			touch $BACKUPPATH/47.$$
+			cp -l $BACKUPPATH/47.$$ $BACKUPPATH/11.$$ &>/dev/null
+			local rc=$?
+			rm $BACKUPPATH/47.$$ &>/dev/null
+			rm $BACKUPPATH/11.$$ &>/dev/null
+			if [[ $rc != 0 ]]; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_USE_HARDLINKS "$BACKUPPATH" "$rc"
+				exitError $RC_LINK_FILE_FAILED
+			fi
 		fi
 	fi
-
-	if (( $LINK_BOOTPARTITIONFILES )) &&  [[ "$BACKUPTYPE" != "$BACKUPTYPE_DD" ]] && [[ "$BACKUPTYPE" != "$BACKUPTYPE_DDZ" ]]; then
-		touch $BACKUPPATH/47.$$
-		cp -l $BACKUPPATH/47.$$ $BACKUPPATH/11.$$ &>/dev/null
-		local rc=$?
-		rm $BACKUPPATH/47.$$ &>/dev/null
-		rm $BACKUPPATH/11.$$ &>/dev/null
-		if [[ $rc != 0 ]]; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_USE_HARDLINKS "$BACKUPPATH" "$rc"
-			exitError $RC_LINK_FILE_FAILED
-		fi
-	fi
-
+	
 	if (( $SYSTEMSTATUS )) && ! which lsof &>/dev/null; then
 		 writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_INSTALLED_FILE "lsof" "lsof"
 		 exitError $RC_MISSING_COMMANDS
@@ -7133,52 +7257,54 @@ function doitBackup() {
 
 	writeToConsole $MSG_LEVEL_MINIMAL $MSG_USING_BACKUPPATH "$BACKUPPATH" "$(getFsType "$BACKUPPATH")"
 
-	if (( ! $SKIPLOCALCHECK )); then
-		if ! isPathMounted $BACKUPPATH; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_DEVICEMOUNTED "$BACKUPPATH"
-			exitError $RC_MISC_ERROR
+	if [[ -z $CLONE ]]; then
+		if (( ! $SKIPLOCALCHECK )); then
+			if ! isPathMounted $BACKUPPATH; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_DEVICEMOUNTED "$BACKUPPATH"
+				exitError $RC_MISC_ERROR
+			fi
+			# check if a mount to any partition on boot device exists
+			logItem "BOOT_DEVICE: $BOOT_DEVICE"
+			local lsblkResult="$(lsblk -l -o name,mountpoint | grep "${BACKUPPATH}" | grep $BOOT_DEVICE)"
+			logItem "lsblkResult: $lsblkResult"
+			local di=($(deviceInfo /dev/$lsblkResult))
+			logItem "di: $di"
+			if [[ "$BOOT_DEVICE" == "${di[0]}" ]]; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_DEVICEMOUNTED "$BACKUPPATH"
+				exitError $RC_MISC_ERROR
+			fi
 		fi
-		# check if a mount to any partition on boot device exists
-		logItem "BOOT_DEVICE: $BOOT_DEVICE"
-		local lsblkResult="$(lsblk -l -o name,mountpoint | grep "${BACKUPPATH}" | grep $BOOT_DEVICE)"
-		logItem "lsblkResult: $lsblkResult"
-		local di=($(deviceInfo /dev/$lsblkResult))
-		logItem "di: $di"
-		if [[ "$BOOT_DEVICE" == "${di[0]}" ]]; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_DEVICEMOUNTED "$BACKUPPATH"
-			exitError $RC_MISC_ERROR
+
+		BACKUPPATH_PARAMETER="$BACKUPPATH"
+		BACKUPPATH="$BACKUPPATH/$HOSTNAME"
+		if [[ ! -d "$BACKUPPATH" ]]; then
+			 if ! mkdir -p "${BACKUPPATH}"; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_DIRECTORY "$BACKUPPATH"
+				exitError $RC_CREATE_ERROR
+			 fi
 		fi
-	fi
 
-	BACKUPPATH_PARAMETER="$BACKUPPATH"
-	BACKUPPATH="$BACKUPPATH/$HOSTNAME"
-	if [[ ! -d "$BACKUPPATH" ]]; then
-		 if ! mkdir -p "${BACKUPPATH}"; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_DIRECTORY "$BACKUPPATH"
-			exitError $RC_CREATE_ERROR
-		 fi
-	fi
+		logCommand "ls -1 ${BACKUPPATH}"
+		local nonRaspiGeneratedDirs=$(ls -1 ${BACKUPPATH} | egrep -Ev "$HOSTNAME\-($POSSIBLE_BACKUP_TYPES_REGEX)\-backup\-([0-9]){8}.([0-9]){6}" | egrep -E "\-backup\-" | wc -l)
+		logItem "nonRaspiGeneratedDirs: $nonRaspiGeneratedDirs"
 
-	logCommand "ls -1 ${BACKUPPATH}"
-	local nonRaspiGeneratedDirs=$(ls -1 ${BACKUPPATH} | egrep -Ev "$HOSTNAME\-($POSSIBLE_BACKUP_TYPES_REGEX)\-backup\-([0-9]){8}.([0-9]){6}" | egrep -E "\-backup\-" | wc -l)
-	logItem "nonRaspiGeneratedDirs: $nonRaspiGeneratedDirs"
-
-	if (( $nonRaspiGeneratedDirs > 0 )); then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_INVALID_BACKUPNAMES_DETECTED $nonRaspiGeneratedDirs $BACKUPPATH
-		exitError $RC_BACKUP_DIRNAME_ERROR
-	fi
-
-	# just inform about options enabled
-
-	if  [[ $BACKUPTYPE != $BACKUPTYPE_DD && $BACKUPTYPE != $BACKUPTYPE_DDZ ]]; then
-		if (( $LINK_BOOTPARTITIONFILES )); then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_LINK_BOOTPARTITIONFILES
+		if (( $nonRaspiGeneratedDirs > 0 )); then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_INVALID_BACKUPNAMES_DETECTED $nonRaspiGeneratedDirs $BACKUPPATH
+			exitError $RC_BACKUP_DIRNAME_ERROR
 		fi
-	fi
 
-	if  [[ $BACKUPTYPE == $BACKUPTYPE_DD || $BACKUPTYPE == $BACKUPTYPE_DDZ ]]; then
-		if (( $DD_BACKUP_SAVE_USED_PARTITIONS_ONLY )); then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_SAVING_USED_PARTITIONS_ONLY
+		# just inform about options enabled
+
+		if  [[ $BACKUPTYPE != $BACKUPTYPE_DD && $BACKUPTYPE != $BACKUPTYPE_DDZ ]]; then
+			if (( $LINK_BOOTPARTITIONFILES )); then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_LINK_BOOTPARTITIONFILES
+			fi
+		fi
+
+		if  [[ $BACKUPTYPE == $BACKUPTYPE_DD || $BACKUPTYPE == $BACKUPTYPE_DDZ ]]; then
+			if (( $DD_BACKUP_SAVE_USED_PARTITIONS_ONLY )); then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_SAVING_USED_PARTITIONS_ONLY
+			fi
 		fi
 	fi
 
@@ -7188,14 +7314,18 @@ function doitBackup() {
 
 	# now either execute a SR dryrun or start backup
 
-	if (( $SMART_RECYCLE_DRYRUN && $SMART_RECYCLE )); then # just apply backup strategy to test smart recycle
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_APPLYING_BACKUP_STRATEGY_ONLY "$BACKUPPATH/$(hostname)"
-		applyBackupStrategy
-		rc=0
-	else
-		if (( $SMART_RECYCLE && !$SMART_RECYCLE_DRYRUN )); then
-			writeToConsole $MSG_LEVEL_DETAILED $MSG_SMART_RECYCLE_WILL_BE_APPLIED
+	if [[ -z $CLONE ]]; then
+		if (( $SMART_RECYCLE_DRYRUN && $SMART_RECYCLE )); then # just apply backup strategy to test smart recycle
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_APPLYING_BACKUP_STRATEGY_ONLY "$BACKUPPATH/$(hostname)"
+			applyBackupStrategy
+			rc=0
+		else
+			if (( $SMART_RECYCLE && !$SMART_RECYCLE_DRYRUN )); then
+				writeToConsole $MSG_LEVEL_DETAILED $MSG_SMART_RECYCLE_WILL_BE_APPLIED
+			fi
+			backup
 		fi
+	else
 		backup
 	fi
 
@@ -9146,6 +9276,12 @@ while (( "$#" )); do
 	  CHECK_FOR_BAD_BLOCKS=$(getEnableDisableOption "$1"); shift 1
 	  ;;
 
+	--clone)
+	  o=$(checkOptionParameter "$1" "$2")
+	  (( $? )) && exitError $RC_PARAMETER_ERROR
+	  CLONE="$o"; shift 2
+	  ;;
+	
 	--coloring)
 	  o=$(checkOptionParameter "$1" "$2")
 	  (( $? )) && exitError $RC_PARAMETER_ERROR
@@ -9482,6 +9618,8 @@ if (( ! $INCLUDE_ONLY )); then
 # set positional arguments in argument list $@
 set -- "$PARAMS"
 
+[[ -n $CLONE ]] && RESTORE=0
+
 if (( $RESTORE )); then
 	rstFileName="${LOG_FILE/$LOGFILE_EXT/$LOGFILE_RESTORE_EXT}"
 	LOG_FILE="$rstFileName"
@@ -9499,19 +9637,21 @@ if (( ! $RESTORE )); then
 	fi
 fi
 
-fileParameter="$1"
-if hasSpaces "$fileParameter"; then
-	writeToConsole $MSG_LEVEL_MINIMAL $MSG_FILE_CONTAINS_SPACES "$fileParameter"
-	exitError $RC_MISC_ERROR
-fi
+if [[ -z $CLONE ]]; then
+	fileParameter="$1"
+	if hasSpaces "$fileParameter"; then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_FILE_CONTAINS_SPACES "$fileParameter"
+		exitError $RC_MISC_ERROR
+	fi
 
-if [[ -n "$1" ]]; then
-	shift 1
-	if [[ ! -d "$fileParameter" && ! -f "$fileParameter" ]]; then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_FILE_ARG_NOT_FOUND "$fileParameter"
-		exitError $RC_MISSING_FILES
-	else
-		fileParameter="$(readlink -f "$fileParameter")"
+	if [[ -n "$1" ]]; then
+		shift 1
+		if [[ ! -d "$fileParameter" && ! -f "$fileParameter" ]]; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_FILE_ARG_NOT_FOUND "$fileParameter"
+			exitError $RC_MISSING_FILES
+		else
+			fileParameter="$(readlink -f "$fileParameter")"
+		fi
 	fi
 fi
 
@@ -9565,24 +9705,32 @@ if (( $UPDATE_CONFIG )); then
 	exitNormal
 fi
 
-logItem "RESTORE: $RESTORE - fileParameter: $fileParameter"
-if [[ -n $fileParameter ]]; then
-	if (( $RESTORE )); then
-		RESTOREFILE="$(readlink -f "$fileParameter")"
-	else
-		BACKUPPATH="$(readlink -f "$fileParameter")"
+if [[ -z $CLONE ]]; then
+
+	logItem "RESTORE: $RESTORE - fileParameter: $fileParameter"
+	if [[ -n $fileParameter ]]; then
+		if (( $RESTORE )); then
+			RESTOREFILE="$(readlink -f "$fileParameter")"
+		else
+			BACKUPPATH="$(readlink -f "$fileParameter")"
+		fi
 	fi
-fi
 
-if ( (( $RESTORE )) && [[ -z "$RESTOREFILE" ]] ) || ( (( ! $RESTORE )) && [[ -z "$BACKUPPATH" ]] ); then
-	writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_FILEPARAMETER
-	mentionHelp
-	exitError $RC_MISSING_FILES
-fi
+	if ( (( $RESTORE )) && [[ -z "$RESTOREFILE" ]] ) || ( (( ! $RESTORE )) && [[ -z "$BACKUPPATH" ]] ); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_FILEPARAMETER
+		mentionHelp
+		exitError $RC_MISSING_FILES
+	fi
 
-if [[ -z $RESTORE_DEVICE ]] && (( $ROOT_PARTITION_DEFINED )); then
-	writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_RESTOREDEVICE_OPTION
-	exitError $RC_PARAMETER_ERROR
+	if [[ -z $RESTORE_DEVICE ]] && (( $ROOT_PARTITION_DEFINED )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_RESTOREDEVICE_OPTION
+		exitError $RC_PARAMETER_ERROR
+	fi
+else
+	if [[ -z $RESTORE_DEVICE ]]; then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_CLONEDEVICE_OPTION
+		exitError $RC_PARAMETER_ERROR
+	fi	
 fi
 
 _prepare_locking
