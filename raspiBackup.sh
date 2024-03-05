@@ -42,7 +42,7 @@ fi
 
 MYSELF="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"					# use linked script name if the link is used
 MYNAME=${MYSELF%.*}
-VERSION="0.6.9.1"                								# -beta, -hotfix or -dev suffixes possible
+VERSION="0.6.9.1-dev"	    								# -beta, -hotfix or -dev suffixes possible
 VERSION_SCRIPT_CONFIG="0.1.7"								# required config version for script
 
 VERSION_VARNAME="VERSION"									# has to match above var names
@@ -3016,6 +3016,25 @@ function bootedFromSD() {
 }
 
 # Input:
+# 	/dev/mmcblk0
+# 	/dev/sda
+#   /dev/nvme0n1
+# Output:
+# 	/dev/mmcblk0p
+# 	/dev/sda
+#   /dev/nvme0n1p
+
+function getDevicePrefix() { # device
+
+	logEntry "$1"
+	local name="$(sed 's@\/dev\/@@' <<< $1)"
+	local partPrefix="/dev/$(getPartitionPrefix $name)"
+
+	logExit "$partPrefix"
+	echo "$partPrefix"
+}
+
+# Input:
 # 	mmcblk0
 # 	sda
 #       nvme0n1
@@ -3898,7 +3917,7 @@ function setupEnvironment() {
 			fi
 		fi
 
-		if [[ -n "$DYNAMIC_MOUNT" ]]; then
+		if [[ -n "$DYNAMIC_MOUNT" ]] && ! isClone; then
 			dynamic_mount "$DYNAMIC_MOUNT"
 		fi
 
@@ -4524,6 +4543,10 @@ function sendEMail() { # content subject
 function cleanupBackupDirectory() {
 
 	logEntry
+
+	if isClone; then
+		logExit
+	fi
 
 	logCommand "ls -la "$BACKUPTARGET_DIR""
 
@@ -5691,7 +5714,7 @@ function backupRsync() { # partition number (for partition based backup)
 
 function backupClone() {
 
-	local verbose target source excludeRoot cmd cmdParms excludeMeta
+	local verbose target source 
 
 	logEntry
 
@@ -5707,9 +5730,9 @@ function backupClone() {
 		initCloneDevice
 	fi
 
-	bootPartitionClone
-	rootPartitionClone
-	synchronizeCmdlineAndfstab
+	bootPartitionClone "$BOOT_DEVICE" "$RESTORE_DEVICE"
+	rootPartitionClone "$BOOT_DEVICE" "$RESTORE_DEVICE"
+	synchronizeCmdlineAndfstab 
 
 	logExit  "$rc"
 
@@ -5770,6 +5793,62 @@ function initCloneDevice() {
 	fi
 
 	waitForPartitionDefsChanged
+
+	local restorePrefix="$(getDevicePrefix $RESTORE_DEVICE)"
+
+	logItem "RESTOREPREFIX: $restorePrefix"
+
+	writeToConsole $MSG_LEVEL_DETAILED $MSG_FORMATTING_FIRST_PARTITION "${restorePrefix}1"
+	mkfs.vfat ${restorePrefix}1 &>>$LOG_FILE
+	
+	writeToConsole $MSG_LEVEL_DETAILED $MSG_FORMATTING_SECOND_PARTITION "${restorePrefix}2"
+	mkfs.ext4 ${restorePrefix}2 &>>$LOG_FILE
+
+	logExit
+}
+
+function bootPartitionClone() { # bootdevice restoredevice
+
+	local verbose
+
+	logEntry "$1 - $2"
+
+	local sourceBootPartition="/dev/$(getPartitionPrefix "$1")1"
+	local targetBootPartition="$(getDevicePrefix "$2")1"
+	logItem "Boot clone - $sourceBootPartition - $targetBootPartition"
+
+	(( $VERBOSE )) && verbose="-v" || verbose=""
+
+	mkdir /mnt/raspiBackupSource
+	mkdir /mnt/raspiBackupTarget
+
+	mount $sourceBootPartition /mnt/raspiBackupSource
+	mount $targetBootPartition /mnt/raspiBackupTarget
+	rsync $RSYNC_BACKUP_OPTIONS $verbose /mnt/raspiBackupSource/* /mnt/raspiBackupTarget
+
+	umount /mnt/raspiBackupSource
+	umount /mnt/raspiBackupTarget
+
+	logExit
+}
+
+function rootPartitionClone() { # rootdevice restoredevice
+
+	local verbose
+
+	logEntry "$1 - $2"
+	local sourceRootPartition="/dev/$(getPartitionPrefix "$1")2"
+	local targetRootPartition="$(getDevicePrefix "$2")2"
+	logItem "Root clone - $sourceRootPartition - $targetRootPartition"
+
+	(( $VERBOSE )) && verbose="-v" || verbose=""
+
+	mount $sourceRootPartition /mnt/raspiBackupSource
+	mount $targetRootPartition /mnt/raspiBackupTarget
+	rsync $RSYNC_BACKUP_OPTIONS $verbose /mnt/raspiBackupSource/* /mnt/raspiBackupTarget
+
+	umount /mnt/raspiBackupSource
+	umount /mnt/raspiBackupTarget
 
 	logExit
 }
@@ -6167,6 +6246,10 @@ function applyBackupStrategy() {
 
 	logEntry "$BACKUP_TARGETDIR"
 
+	if isClone; then
+		logExit
+	fi
+
 	if (( $SMART_RECYCLE )); then
 
 		local dir_to_delete dir_to_keep
@@ -6342,7 +6425,7 @@ function backup() {
 					$BACKUPTYPE_RSYNC) backupRsync
 						;;
 
-					$BACKUPTYPE_CLONE) backupClone
+					$BACKUPTYPE_CLONE|$BACKUPTYPE_CLONEINIT) backupClone
 						;;
 
 					*) assertionFailed $LINENO "Invalid backuptype $BACKUPTYPE"
@@ -6868,7 +6951,7 @@ function inspect4Backup() {
 
 		BOOT_DEVICE="${boot[0]}"
 
-		if [[ "${boot[@]}" == "${root[@]}" ]]; then
+		if [[ "${boot[@]}" == "${root[@]}" ]] && ! isClone; then
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_SHARED_BOOT_DEVICE "/dev/$BOOT_DEVICE"
 			SHARED_BOOT_DIRECTORY=1
 		fi
@@ -7242,7 +7325,7 @@ function doitBackup() {
 		 exitError $RC_MISSING_COMMANDS
 	fi
 
-	writeToConsole $MSG_LEVEL_MINIMAL $MSG_USING_BACKUPPATH "$BACKUPPATH" "$(getFsType "$BACKUPPATH")"
+	! isClone && writeToConsole $MSG_LEVEL_MINIMAL $MSG_USING_BACKUPPATH "$BACKUPPATH" "$(getFsType "$BACKUPPATH")"
 
 	if ! isClone; then
 		if (( ! $SKIPLOCALCHECK )); then
@@ -9716,7 +9799,8 @@ else
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_CLONE_DEVICE_NOT_VALID "$RESTORE_DEVICE"
 		exitError $RC_MISC_ERROR
 	fi
-
+	
+	LOG_OUTPUT=$LOG_OUTPUT_HOME
 fi
 
 _prepare_locking
