@@ -226,12 +226,12 @@ BACKUPTYPE_DDZ="ddz"
 BACKUPTYPE_TAR="tar"
 BACKUPTYPE_TGZ="tgz"
 BACKUPTYPE_RSYNC="rsync"
-POSSIBLE_BACKUP_TYPES_REGEX="$BACKUPTYPE_DD|$BACKUPTYPE_DDZ|$BACKUPTYPE_RSYNC|$BACKUPTYPE_TAR|$BACKUPTYPE_TGZ"
+BACKUPTYPE_CLONE="clone"
+BACKUPTYPE_CLONEINIT="initclone"
+POSSIBLE_BACKUP_TYPES_REGEX="$BACKUPTYPE_DD|$BACKUPTYPE_DDZ|$BACKUPTYPE_RSYNC|$BACKUPTYPE_TAR|$BACKUPTYPE_TGZ|$BACKUPTYPE_CLONE|BACKUPTYPE_CLONEINIT"
 declare -A FILE_EXTENSION=( [$BACKUPTYPE_DD]=".img" [$BACKUPTYPE_DDZ]=".img.gz" [$BACKUPTYPE_RSYNC]="" [$BACKUPTYPE_TGZ]=".tgz" [$BACKUPTYPE_TAR]=".tar" )
 # map dd/tar to ddz/tgz extension if -z switch is used
 declare -A Z_TYPE_MAPPING=( [$BACKUPTYPE_DD]=$BACKUPTYPE_DDZ [$BACKUPTYPE_TAR]=$BACKUPTYPE_TGZ )
-
-BACKUPTYPE_CLONE="clone"
 
 readarray -t SORTED < <(for a in "${!FILE_EXTENSION[@]}"; do echo "$a"; done | sort)
 ALLOWED_TYPES=""
@@ -329,10 +329,6 @@ SUPPORTED_EMAIL_COLORING=$(echo $SUPPORTED_EMAIL_COLORING_REGEX | sed 's:^..\(.*
 
 PARTITIONS_TO_BACKUP_ALL="*"
 MASQUERADE_STRING="@@@@"
-
-CLONE_INITIAL="I"
-CLONE_SYNC="S"
-CLONE_VALID_OPTIONS="$CLONE_INITIAL$CLONE_SYNC"
 
 COLORING_OFF=""
 COLORING_CONSOLE="C"
@@ -1937,12 +1933,12 @@ MSG_DE[$MSG_SYNC_CMDLINE_FSTAB]="RBK0295I: %s und %s werden synchronisiert."
 OVERLAY_FILESYSTEM_NOT_SUPPORTED=296
 MSG_EN[$OVERLAY_FILESYSTEM_NOT_SUPPORTED]="RBK0296E: Overlay filesystem is not supported."
 MSG_DE[$OVERLAY_FILESYSTEM_NOT_SUPPORTED]="RBK0296E: Overlayfilesystem wird nicht unterstützt."
-MSG_INVALID_CLONE_OPTION=297
-MSG_EN[$MSG_INVALID_CLONE_OPTION]="RBK0297E: Invalid clone option %s detected."
-MSG_DE[$MSG_INVALID_CLONE_OPTION]="RBK0297E: Ungültige Cloneoption %s entdeckt."
+#MSG_INVALID_CLONE_OPTION=297
+#MSG_EN[$MSG_INVALID_CLONE_OPTION]="RBK0297E: Invalid clone option %s detected."
+#MSG_DE[$MSG_INVALID_CLONE_OPTION]="RBK0297E: Ungültige Cloneoption %s entdeckt."
 MSG_MISSING_CLONEDEVICE_OPTION=298
-MSG_EN[$MSG_MISSING_CLONEDEVICE_OPTION]="RBK0299E: Option --clone requires also option -d."
-MSG_DE[$MSG_MISSING_CLONEDEVICE_OPTION]="RBK0298E: Option --clone benötigt auch Option -d."
+MSG_EN[$MSG_MISSING_CLONEDEVICE_OPTION]="RBK0299E: Backuptype clone requires also option -d."
+MSG_DE[$MSG_MISSING_CLONEDEVICE_OPTION]="RBK0298E: Backuptyp clone benötigt auch Option -d."
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -2682,8 +2678,6 @@ function logOptions() { # option state
 	logItem "BEFORE_STOPSERVICES=$BEFORE_STOPSERVICES"
 	logItem "BOOT_DEVICE=$BOOT_DEVICE"
 	logItem "CHECK_FOR_BAD_BLOCKS=$CHECK_FOR_BAD_BLOCKS"
-	logItem "CLONE=$CLONE"
-	logItem "CLONE_INIT=$CLONE_INIT"
 	logItem "COLOR_CODES="${COLOR_CODES[@]}""
  	logItem "COLORING=$COLORING"
  	logItem "CONFIG_FILE=$CONFIG_FILE"
@@ -2872,8 +2866,6 @@ function initializeDefaultConfigVariables() {
 	DEFAULT_SMART_RECYCLE_OPTIONS="7 4 12 1"
 	# Check for back blocks when formating restore device (Will take a long time)
 	DEFAULT_CHECK_FOR_BAD_BLOCKS=0
-	# Clone system
-	CLONE=""
 	# Resize root filesystem during restore
 	DEFAULT_RESIZE_ROOTFS=1
 	# add timestamps in front of messages
@@ -2935,7 +2927,6 @@ function copyDefaultConfigVariables() {
 	AFTER_STARTSERVICES="$DEFAULT_AFTER_STARTSERVICES"
 	BEFORE_STOPSERVICES="$DEFAULT_BEFORE_STOPSERVICES"
 	CHECK_FOR_BAD_BLOCKS="$DEFAULT_CHECK_FOR_BAD_BLOCKS"
-	CLONE="$CLONE"
 	COLOR_CODES=("${DEFAULT_COLOR_CODES[0]}" "${DEFAULT_COLOR_CODES[1]}")
 	COLORING="$DEFAULT_COLORING"
 	DD_BACKUP_SAVE_USED_PARTITIONS_ONLY="$DEFAULT_DD_BACKUP_SAVE_USED_PARTITIONS_ONLY"
@@ -3745,6 +3736,10 @@ function supportsSymlinks() {	# directory
 	logExit "$result"
 
 	return $result
+}
+
+function isClone() {
+	[[ $BACKUPTYPE == $BACKUPTYPE_CLONE || $BACKUPTYPE == $BACKUPTYPE_CLONEINIT ]]
 }
 
 function isMounted() { # dir
@@ -5694,7 +5689,7 @@ function backupRsync() { # partition number (for partition based backup)
 
 }
 
-function backupClone() { 
+function backupClone() {
 
 	local verbose target source excludeRoot cmd cmdParms excludeMeta
 
@@ -5708,11 +5703,11 @@ function backupClone() {
 	target="\"${BACKUPTARGET_DIR}\""
 	source="/"
 
-	if [[ $CLONE_INITIAL ]]; then
+	if [[ $BACKUPTYPE == $BACKUPTYPE_CLONEINIT ]]; then
 		initCloneDevice
 	fi
 
-	bootPartitionClone	
+	bootPartitionClone
 	rootPartitionClone
 	synchronizeCmdlineAndfstab
 
@@ -6309,7 +6304,7 @@ function backup() {
 		exitError $RC_BACKUP_EXTENSION_FAILS
 	fi
 
-	if [[ -z $CLONE ]]; then
+	if ! isClone; then
 
 		if [[ $BACKUPTYPE == $BACKUPTYPE_RSYNC || (( $PARTITIONBASED_BACKUP )) ]]; then
 			writeToConsole $MSG_LEVEL_DETAILED $MSG_BACKUP_TARGET "$BACKUPTYPE" "$BACKUPTARGET_DIR"
@@ -6319,12 +6314,10 @@ function backup() {
 
 		logItem "Storing backup in backuppath $BACKUPPATH"
 	fi
-	
+
 	if [[ -f $BOOT_DEVICENAME ]]; then
 		logCommand "fdisk -l $BOOT_DEVICENAME"
 	fi
-
-	[[ -n $CLONE ]] && BACKUPTYPE=$BACKUPTYPE_CLONE;
 
 	logItem "Starting $BACKUPTYPE backup..."
 
@@ -6754,12 +6747,6 @@ function commonChecks() {
 			exitError $RC_PARAMETER_ERROR
 	fi
 
-	local cl="$(tr -d "$CLONE_VALID_OPTIONS" <<< $CLONE)"
-	if [[ -n "$CLONE" && -n "$cl" ]]; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_INVALID_CLONE_OPTION "$cl"
-			exitError $RC_PARAMETER_ERROR
-	fi
-
 	logExit
 
 }
@@ -7020,7 +7007,7 @@ function doitBackup() {
 
 	commonChecks
 
-	if [[ -z $CLONE ]]; then
+	if ! isClone; then
 
 		if hasSpaces "$BACKUPPATH"; then
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_FILE_CONTAINS_SPACES "$BACKUPPATH"
@@ -7117,7 +7104,7 @@ function doitBackup() {
 			exitError $RC_PARAMETER_ERROR
 		fi
 	fi
-	
+
 	if [[ -n "$TELEGRAM_CHATID" && -z "$TELEGRAM_TOKEN" ]] || [[ -z "$TELEGRAM_CHATID" && -n "$TELEGRAM_TOKEN" ]]; then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_TELEGRAM_OPTIONS_INCOMPLETE
 		exitError $RC_PARAMETER_ERROR
@@ -7160,7 +7147,7 @@ function doitBackup() {
 		fi
 	fi
 
-	if [[ -z $CLONE ]]; then
+	if ! isClone; then
 
 		if [[ "$BACKUPTYPE" == "$BACKUPTYPE_DD" || "$BACKUPTYPE" == "$BACKUPTYPE_DDZ" ]]; then
 			(( $DD_WARNING )) && writeToConsole $MSG_LEVEL_MINIMAL $MSG_DD_WARNING
@@ -7200,7 +7187,7 @@ function doitBackup() {
 			fi
 		fi
 	fi
-	
+
 	if [[ -z "$STARTSERVICES" && -z "$STOPSERVICES" ]]; then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_START_STOP
 		exitError $RC_PARAMETER_ERROR
@@ -7226,7 +7213,7 @@ function doitBackup() {
 		fi
 	fi
 
-	if [[ -z $CLONE ]]; then
+	if ! isClone; then
 		if (( $PARTITIONBASED_BACKUP )); then
 			if [[ $BACKUPTYPE == $BACKUPTYPE_DD || $BACKUPTYPE == $BACKUPTYPE_DDZ ]]; then
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_DD_BACKUP_NOT_POSSIBLE_FOR_PARTITIONBASED_BACKUP
@@ -7249,7 +7236,7 @@ function doitBackup() {
 			fi
 		fi
 	fi
-	
+
 	if (( $SYSTEMSTATUS )) && ! which lsof &>/dev/null; then
 		 writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_INSTALLED_FILE "lsof" "lsof"
 		 exitError $RC_MISSING_COMMANDS
@@ -7257,7 +7244,7 @@ function doitBackup() {
 
 	writeToConsole $MSG_LEVEL_MINIMAL $MSG_USING_BACKUPPATH "$BACKUPPATH" "$(getFsType "$BACKUPPATH")"
 
-	if [[ -z $CLONE ]]; then
+	if ! isClone; then
 		if (( ! $SKIPLOCALCHECK )); then
 			if ! isPathMounted $BACKUPPATH; then
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_DEVICEMOUNTED "$BACKUPPATH"
@@ -7314,7 +7301,7 @@ function doitBackup() {
 
 	# now either execute a SR dryrun or start backup
 
-	if [[ -z $CLONE ]]; then
+	if ! isClone; then
 		if (( $SMART_RECYCLE_DRYRUN && $SMART_RECYCLE )); then # just apply backup strategy to test smart recycle
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_APPLYING_BACKUP_STRATEGY_ONLY "$BACKUPPATH/$(hostname)"
 			applyBackupStrategy
@@ -9276,12 +9263,6 @@ while (( "$#" )); do
 	  CHECK_FOR_BAD_BLOCKS=$(getEnableDisableOption "$1"); shift 1
 	  ;;
 
-	--clone)
-	  o=$(checkOptionParameter "$1" "$2")
-	  (( $? )) && exitError $RC_PARAMETER_ERROR
-	  CLONE="$o"; shift 2
-	  ;;
-	
 	--coloring)
 	  o=$(checkOptionParameter "$1" "$2")
 	  (( $? )) && exitError $RC_PARAMETER_ERROR
@@ -9618,7 +9599,7 @@ if (( ! $INCLUDE_ONLY )); then
 # set positional arguments in argument list $@
 set -- "$PARAMS"
 
-[[ -n $CLONE ]] && RESTORE=0
+isClone && RESTORE=0
 
 if (( $RESTORE )); then
 	rstFileName="${LOG_FILE/$LOGFILE_EXT/$LOGFILE_RESTORE_EXT}"
@@ -9637,7 +9618,7 @@ if (( ! $RESTORE )); then
 	fi
 fi
 
-if [[ -z $CLONE ]]; then
+if ! isClone; then
 	fileParameter="$1"
 	if hasSpaces "$fileParameter"; then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_FILE_CONTAINS_SPACES "$fileParameter"
@@ -9705,7 +9686,7 @@ if (( $UPDATE_CONFIG )); then
 	exitNormal
 fi
 
-if [[ -z $CLONE ]]; then
+if ! isClone; then
 
 	logItem "RESTORE: $RESTORE - fileParameter: $fileParameter"
 	if [[ -n $fileParameter ]]; then
@@ -9730,7 +9711,7 @@ else
 	if [[ -z $RESTORE_DEVICE ]]; then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_CLONEDEVICE_OPTION
 		exitError $RC_PARAMETER_ERROR
-	fi	
+	fi
 fi
 
 _prepare_locking
