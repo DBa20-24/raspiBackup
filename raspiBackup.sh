@@ -5090,6 +5090,12 @@ function cleanupBackup() { # trap
 
 	cleanupBackupDirectory
 
+	if isClone; then
+		umount /mnt/raspiBackupSource &>> $LOG_FILE
+		rm /mnt/raspiBackupSource &>> $LOG_FILE
+		umount /mnt/raspiBackupTarget &>> $LOG_FILE
+		rm /mnt/raspiBackupTarget &>> $LOG_FILE
+	fi
 	logExit
 
 }
@@ -5732,7 +5738,8 @@ function backupClone() {
 
 	bootPartitionClone "$BOOT_DEVICE" "$RESTORE_DEVICE"
 	rootPartitionClone "$BOOT_DEVICE" "$RESTORE_DEVICE"
-	synchronizeCmdlineAndfstab 
+	updateUUIDs
+	synchronizeCmdlineAndfstab
 
 	logExit  "$rc"
 
@@ -5819,15 +5826,23 @@ function bootPartitionClone() { # bootdevice restoredevice
 
 	(( $VERBOSE )) && verbose="-v" || verbose=""
 
-	mkdir /mnt/raspiBackupSource
-	mkdir /mnt/raspiBackupTarget
+	mkdir /mnt/raspiBackupSource &>> $LOG_FILE
+	if (( ! $? )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_DIRECTORY "/mnt/raspiBackupSource"
+		exitError $RC_CREATE_ERROR
+	fi
+	mkdir /mnt/raspiBackupTarget &>> $LOG_FILE
+	if (( ! $? )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_DIRECTORY "/mnt/raspiBackupTarget"
+		exitError $RC_CREATE_ERROR
+	fi
 
-	mount $sourceBootPartition /mnt/raspiBackupSource
-	mount $targetBootPartition /mnt/raspiBackupTarget
+	mount $sourceBootPartition /mnt/raspiBackupSource &>>$LOG_FILE
+	mount $targetBootPartition /mnt/raspiBackupTarget &>>$LOG_FILE
 	rsync $RSYNC_BACKUP_OPTIONS $verbose /mnt/raspiBackupSource/* /mnt/raspiBackupTarget
 
-	umount /mnt/raspiBackupSource
-	umount /mnt/raspiBackupTarget
+	umount /mnt/raspiBackupSource &>> $LOG_FILE
+	umount /mnt/raspiBackupTarget &>> $LOG_FILE
 
 	logExit
 }
@@ -5843,12 +5858,23 @@ function rootPartitionClone() { # rootdevice restoredevice
 
 	(( $VERBOSE )) && verbose="-v" || verbose=""
 
-	mount $sourceRootPartition /mnt/raspiBackupSource
-	mount $targetRootPartition /mnt/raspiBackupTarget
+	mkdir /mnt/raspiBackupSource &>> $LOG_FILE
+	if (( ! $? )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_DIRECTORY "/mnt/raspiBackupSource"
+		exitError $RC_CREATE_ERROR
+	fi
+	mkdir /mnt/raspiBackupTarget &>> $LOG_FILE
+	if (( ! $? )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_DIRECTORY "/mnt/raspiBackupTarget"
+		exitError $RC_CREATE_ERROR
+	fi
+
+	mount $sourceRootPartition /mnt/raspiBackupSource &>>$LOG_FILE
+	mount $targetRootPartition /mnt/raspiBackupTarget &>>$LOG_FILE
 	rsync $RSYNC_BACKUP_OPTIONS $verbose /mnt/raspiBackupSource/* /mnt/raspiBackupTarget
 
-	umount /mnt/raspiBackupSource
-	umount /mnt/raspiBackupTarget
+	umount /mnt/raspiBackupSource &>> $LOG_FILE
+	umount /mnt/raspiBackupTarget &>> $LOG_FILE
 
 	logExit
 }
@@ -6248,6 +6274,7 @@ function applyBackupStrategy() {
 
 	if isClone; then
 		logExit
+		return
 	fi
 
 	if (( $SMART_RECYCLE )); then
@@ -8615,7 +8642,7 @@ function synchronizeCmdlineAndfstab() {
 		BOOT_PARTITION="${RESTORE_DEVICE}1"
 	fi
 
-	if (( $PARTITIONBASED_BACKUP )); then
+	if (( $PARTITIONBASED_BACKUP )) || isClone; then
 		ROOT_PARTITION="$(sed 's/1$/2/' <<< "$BOOT_PARTITION")"
 	fi
 
