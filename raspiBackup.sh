@@ -1933,12 +1933,12 @@ MSG_DE[$MSG_SYNC_CMDLINE_FSTAB]="RBK0295I: %s und %s werden synchronisiert."
 OVERLAY_FILESYSTEM_NOT_SUPPORTED=296
 MSG_EN[$OVERLAY_FILESYSTEM_NOT_SUPPORTED]="RBK0296E: Overlay filesystem is not supported."
 MSG_DE[$OVERLAY_FILESYSTEM_NOT_SUPPORTED]="RBK0296E: Overlayfilesystem wird nicht unterstützt."
-#MSG_INVALID_CLONE_OPTION=297
-#MSG_EN[$MSG_INVALID_CLONE_OPTION]="RBK0297E: Invalid clone option %s detected."
-#MSG_DE[$MSG_INVALID_CLONE_OPTION]="RBK0297E: Ungültige Cloneoption %s entdeckt."
+MSG_CLONE_DEVICE_NOT_VALID=297
+MSG_EN[$MSG_CLONE_DEVICE_NOT_VALID]="RBK0297E: Clone device %s is no valid device."
+MSG_DE[$MSG_CLONE_DEVICE_NOT_VALID]="RBK0297E: Das Clonegerät %s ist kein gültiges Gerät."
 MSG_MISSING_CLONEDEVICE_OPTION=298
 MSG_EN[$MSG_MISSING_CLONEDEVICE_OPTION]="RBK0299E: Backuptype clone requires also option -d."
-MSG_DE[$MSG_MISSING_CLONEDEVICE_OPTION]="RBK0298E: Backuptyp clone benötigt auch Option -d."
+MSG_DE[$MSG_MISSING_CLONEDEVICE_OPTION]="RBK0298E: Backuptyp clone erfordert auch Option -d."
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -9712,6 +9712,11 @@ else
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_CLONEDEVICE_OPTION
 		exitError $RC_PARAMETER_ERROR
 	fi
+	if [[ ! -b "$RESTORE_DEVICE" ]]; then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_CLONE_DEVICE_NOT_VALID "$RESTORE_DEVICE"
+		exitError $RC_MISC_ERROR
+	fi
+
 fi
 
 _prepare_locking
