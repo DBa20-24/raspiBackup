@@ -1949,11 +1949,17 @@ MSG_CREATING_BOOT_CLONE=300
 MSG_EN[$MSG_CREATING_BOOT_CLONE]="RBK0300I: Creating clone of boot partition on %s."
 MSG_DE[$MSG_CREATING_BOOT_CLONE]="RBK0300I: Clone der Bootpartition wird auf %s erstellt."
 MSG_SYNCING_ROOT_CLONE=301
-MSG_EN[$MSG_SYNCING_ROOT_CLONE]="RBK0301I: Syning clone of root partition on %s."
+MSG_EN[$MSG_SYNCING_ROOT_CLONE]="RBK0301I: Syncing clone of root partition on %s."
 MSG_DE[$MSG_SYNCING_ROOT_CLONE]="RBK0301I: Synchonisiere Clone der Rootpartition auf %s erstellt."
 MSG_SYNCING_BOOT_CLONE=302
 MSG_EN[$MSG_SYNCING_BOOT_CLONE]="RBK0302I: Syncing clone of boot partition on %s."
 MSG_DE[$MSG_SYNCING_BOOT_CLONE]="RBK0302I: Synchronisiere Clone der Bootpartition auf %s erstellt."
+MSG_CLONE_ABORTED=303
+MSG_EN[$MSG_CLONE_ABORTED]="RBK0303I: Clone aborted."
+MSG_DE[$MSG_CLONE_ABORTED]="RBK0303I: Clone abgebrochen."
+MSG_SYNCING_CLONE=304
+MSG_EN[$MSG_SYNCING_CLONE]="RBK0304I: Syncing clone on device %s."
+MSG_DE[$MSG_SYNCING_CLONE]="RBK0304I: Synchronisiere Clone auf dem Gerät %s."
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -2742,6 +2748,7 @@ function logOptions() { # option state
 	logItem "ROOT_PARTITION=$ROOT_PARTITION"
 	logItem "RSYNC_BACKUP_ADDITIONAL_OPTIONS=$RSYNC_BACKUP_ADDITIONAL_OPTIONS"
 	logItem "RSYNC_BACKUP_OPTIONS=$RSYNC_BACKUP_OPTIONS"
+	logItem "RSYNC_CLONE_OPTIONS=$RSYNC_CLONE_OPTIONS"
 	logItem "RSYNC_IGNORE_ERRORS=$RSYNC_IGNORE_ERRORS"
 	logItem "SENDER_EMAIL=$SENDER_EMAIL"
  	logItem "SKIP_DEPRECATED=$SKIP_DEPRECATED"
@@ -2865,6 +2872,7 @@ function initializeDefaultConfigVariables() {
 	DEFAULT_REBOOT_SYSTEM=0
 	# Change these options only if you know what you are doing !!!
 	DEFAULT_RSYNC_BACKUP_OPTIONS="-aHAx --delete"
+	DEFAULT_RSYNC_CLONE_OPTIONS="-aHAxXE --delete"
 	DEFAULT_RSYNC_BACKUP_ADDITIONAL_OPTIONS=""
 	DEFAULT_TAR_BACKUP_OPTIONS="-cpi --one-file-system"
 	DEFAULT_TAR_BACKUP_ADDITIONAL_OPTIONS=""
@@ -2988,6 +2996,7 @@ function copyDefaultConfigVariables() {
 	RESTORE_EXTENSIONS="$DEFAULT_RESTORE_EXTENSIONS"
 	RSYNC_BACKUP_ADDITIONAL_OPTIONS="$DEFAULT_RSYNC_BACKUP_ADDITIONAL_OPTIONS"
 	RSYNC_BACKUP_OPTIONS="$DEFAULT_RSYNC_BACKUP_OPTIONS"
+	RSYNC_CLONE_OPTIONS="$DEFAULT_RSYNC_CLONE_OPTIONS"
 	SENDER_EMAIL="$DEFAULT_SENDER_EMAIL"
 	SKIPLOCALCHECK="$DEFAULT_SKIPLOCALCHECK"
 	SLACK_WEBHOOK_URL="$DEFAULT_SLACK_WEBHOOK_URL"
@@ -3922,7 +3931,8 @@ function setupEnvironment() {
 
 	logEntry
 
-	if (( ! $RESTORE )); then
+	if (( ! $RESTORE )) && ! isClone; then
+	
 		ZIP_BACKUP_TYPE_INVALID=0		# logging not enabled right now, invalid backuptype will be handled later
 		if (( $ZIP_BACKUP )); then
 			if [[ $BACKUPTYPE == $BACKUPTYPE_DD || $BACKUPTYPE == $BACKUPTYPE_TAR ]]; then
@@ -3932,7 +3942,7 @@ function setupEnvironment() {
 			fi
 		fi
 
-		if [[ -n "$DYNAMIC_MOUNT" ]] && ! isClone; then
+		if [[ -n "$DYNAMIC_MOUNT" ]]; then
 			dynamic_mount "$DYNAMIC_MOUNT"
 		fi
 
@@ -5106,12 +5116,6 @@ function cleanupBackup() { # trap
 
 	cleanupBackupDirectory
 
-	if isClone; then
-		umount /mnt/raspiBackupSource &>> $LOG_FILE
-		rm /mnt/raspiBackupSource &>> $LOG_FILE
-		umount /mnt/raspiBackupTarget &>> $LOG_FILE
-		rm /mnt/raspiBackupTarget &>> $LOG_FILE
-	fi
 	logExit
 
 }
@@ -5123,6 +5127,15 @@ function cleanupTempFiles() {
 	if [[ -f $MYSELF~ ]]; then
 		logItem "Removing new version $MYSELF~"
 		rm -f $MYSELF~ &>/dev/null
+	fi
+
+	if [[ -e $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource ]]; then
+		umount $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource &>> $LOG_FILE
+		rmdir $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource &>> $LOG_FILE
+	fi
+	if [[ -e $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget ]]; then		
+		umount $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget &>> $LOG_FILE
+		rmdir $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget &>> $LOG_FILE
 	fi
 
 	logExit
@@ -5749,11 +5762,28 @@ function backupClone() {
 	source="/"
 
 	if [[ $BACKUPTYPE == $BACKUPTYPE_CLONEINIT ]]; then
-		initCloneDevice
+		if (( $INTERACTIVE )); then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_REPARTITION_WARNING $RESTORE_DEVICE
+		
+			if ! askYesNo; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_CLONE_ABORTED
+				exitError $RC_RESTORE_FAILED
+			fi
+		fi
+		cloneInitDevice
+	else
+		if (( $INTERACTIVE )); then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_SYNCING_CLONE $RESTORE_DEVICE
+		
+			if ! askYesNo; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_CLONE_ABORTED
+				exitError $RC_RESTORE_FAILED
+			fi
+		fi
 	fi
 
-	bootPartitionClone "$BOOT_DEVICE" "$RESTORE_DEVICE"
-	rootPartitionClone "$BOOT_DEVICE" "$RESTORE_DEVICE"
+	cloneBootPartition "$BOOT_DEVICE" "$RESTORE_DEVICE"
+	cloneRootPartition "$BOOT_DEVICE" "$RESTORE_DEVICE"
 	updateUUIDs
 	synchronizeCmdlineAndfstab
 
@@ -5761,7 +5791,7 @@ function backupClone() {
 
 }
 
-function initCloneDevice() {
+function cloneInitDevice() {
 
 	logEntry
 
@@ -5832,7 +5862,7 @@ function initCloneDevice() {
 	logExit
 }
 
-function bootPartitionClone() { # bootdevice restoredevice
+function cloneBootPartition() { # bootdevice restoredevice
 
 	local verbose
 
@@ -5845,40 +5875,48 @@ function bootPartitionClone() { # bootdevice restoredevice
 	if [[ $BACKUPTYPE == $BACKUPTYPE_CLONEINIT ]]; then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_CREATING_BOOT_CLONE $targetBootPartition
 	else
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_SYNCING_BOOT_CLONE $targetBootPartitionfi
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_SYNCING_BOOT_CLONE $targetBootPartition
 	fi
 
 	(( $VERBOSE )) && verbose="-v" || verbose=""
 
-	mkdir /mnt/raspiBackupSource &>> $LOG_FILE
-	if (( ! $? )); then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_DIRECTORY "/mnt/raspiBackupSource"
+	mkdir $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource &>> $LOG_FILE
+	if (( $? )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_DIRECTORY "$TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource"
 		exitError $RC_CREATE_ERROR
 	fi
-	mkdir /mnt/raspiBackupTarget &>> $LOG_FILE
-	if (( ! $? )); then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_DIRECTORY "/mnt/raspiBackupTarget"
+	mkdir $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget &>> $LOG_FILE
+	if (( $? )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_DIRECTORY "$TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget"
 		exitError $RC_CREATE_ERROR
 	fi
 
-	remount $sourceBootPartition /mnt/raspiBackupSource &>>$LOG_FILE
-	remount $targetBootPartition /mnt/raspiBackupTarget &>>$LOG_FILE
-	rsync $RSYNC_BACKUP_OPTIONS $verbose /mnt/raspiBackupSource/* /mnt/raspiBackupTarget
+	mount $sourceBootPartition $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource &>>$LOG_FILE
+	mount $targetBootPartition $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget &>>$LOG_FILE
+	rsync $RSYNC_CLONE_OPTIONS $verbose $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource/* $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget
 
-	umount /mnt/raspiBackupSource &>> $LOG_FILE
-	umount /mnt/raspiBackupTarget &>> $LOG_FILE
+	umount $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource &>> $LOG_FILE
+	umount $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget &>> $LOG_FILE
 
 	logExit
 }
 
-function rootPartitionClone() { # rootdevice restoredevice
+function cloneRootPartition() { # rootdevice restoredevice
 
-	local verbose
+	local verbose local swapfile excludeSwapfile
 
 	logEntry "$1 - $2"
 	local sourceRootPartition="/dev/$(getPartitionPrefix "$1")2"
 	local targetRootPartition="$(getDevicePrefix "$2")2"
 	logItem "Root clone - $sourceRootPartition - $targetRootPartition"
+
+	if [[ -f /etc/dphys-swapfile ]]; then
+		swapfile="$(grep ^CONF_SWAPFILE /etc/dphys-swapfile| cut -f 2 -d=)"
+		if [[ -z "$swapfile" ]]; then
+			swapfile=/var/swap
+		fi
+		excludeSwapfile="--exclude $swapfile"
+	fi
 
 	(( $VERBOSE )) && verbose="-v" || verbose=""
 
@@ -5888,20 +5926,21 @@ function rootPartitionClone() { # rootdevice restoredevice
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_SYNCING_ROOT_CLONE $targetRootPartition
 	fi
 
-	mkdir /mnt/raspiBackupSource &>> $LOG_FILE
+	mkdir $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource &>> $LOG_FILE
 	if (( ! $? )); then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_DIRECTORY "/mnt/raspiBackupSource"
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_DIRECTORY "$TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource"
 		exitError $RC_CREATE_ERROR
 	fi
-	mkdir /mnt/raspiBackupTarget &>> $LOG_FILE
+	mkdir $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget &>> $LOG_FILE
 	if (( ! $? )); then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_DIRECTORY "/mnt/raspiBackupTarget"
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_DIRECTORY "$TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget"
 		exitError $RC_CREATE_ERROR
 	fi
 
-	remount $sourceRootPartition /mnt/raspiBackupSource &>>$LOG_FILE
-	remount $targetRootPartition /mnt/raspiBackupTarget &>>$LOG_FILE
-	rsync $RSYNC_BACKUP_OPTIONS $verbose \
+	mount $sourceRootPartition $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource &>>$LOG_FILE
+	mount $targetRootPartition $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget &>>$LOG_FILE
+	rsync $RSYNC_CLONE_OPTIONS $verbose \
+			$excludeSwapfile \
 			--exclude '.gvfs' \
 			--exclude '/dev/*' \
 			--exclude '/mnt/raspi*/*' \
@@ -5910,10 +5949,10 @@ function rootPartitionClone() { # rootdevice restoredevice
 			--exclude '/sys/*' \
 			--exclude '/tmp/*' \
 			--exclude 'lost\+found/*' \
-			/mnt/raspiBackupSource/* /mnt/raspiBackupTarget
+			$TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource/* $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget
 
-	umount /mnt/raspiBackupSource &>> $LOG_FILE
-	umount /mnt/raspiBackupTarget &>> $LOG_FILE
+	umount $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource &>> $LOG_FILE
+	umount $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget &>> $LOG_FILE
 
 	logExit
 }
@@ -9823,7 +9862,7 @@ if (( $UPDATE_MYSELF )); then
 	exitNormal
 fi
 
-if (( $NO_YES_QUESTION )); then				# WARNING: dangerous option !!!
+if (( $NO_YES_QUESTION )) && ! isClone; then				# WARNING: dangerous option !!!
 	if [[ ! $RESTORE_DEVICE =~ $YES_NO_RESTORE_DEVICE ]]; then	# make sure we're not killing a disk by accident
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_YES_NO_DEVICE_MISMATCH $RESTORE_DEVICE $YES_NO_RESTORE_DEVICE
 		exitError $RC_MISC_ERROR
