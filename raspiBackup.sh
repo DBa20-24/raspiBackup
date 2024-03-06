@@ -227,7 +227,7 @@ BACKUPTYPE_TAR="tar"
 BACKUPTYPE_TGZ="tgz"
 BACKUPTYPE_RSYNC="rsync"
 BACKUPTYPE_CLONE="clone"
-BACKUPTYPE_CLONEINIT="initclone"
+BACKUPTYPE_CLONEINIT="cloneinit"
 POSSIBLE_BACKUP_TYPES_REGEX="$BACKUPTYPE_DD|$BACKUPTYPE_DDZ|$BACKUPTYPE_RSYNC|$BACKUPTYPE_TAR|$BACKUPTYPE_TGZ|$BACKUPTYPE_CLONE|BACKUPTYPE_CLONEINIT"
 declare -A FILE_EXTENSION=( [$BACKUPTYPE_DD]=".img" [$BACKUPTYPE_DDZ]=".img.gz" [$BACKUPTYPE_RSYNC]="" [$BACKUPTYPE_TGZ]=".tgz" [$BACKUPTYPE_TAR]=".tar" )
 # map dd/tar to ddz/tgz extension if -z switch is used
@@ -1939,6 +1939,9 @@ MSG_DE[$MSG_CLONE_DEVICE_NOT_VALID]="RBK0297E: Das Clonegerät %s ist kein gült
 MSG_MISSING_CLONEDEVICE_OPTION=298
 MSG_EN[$MSG_MISSING_CLONEDEVICE_OPTION]="RBK0299E: Backuptype clone requires also option -d."
 MSG_DE[$MSG_MISSING_CLONEDEVICE_OPTION]="RBK0298E: Backuptyp clone erfordert auch Option -d."
+MSG_CREATING_ROOT_BACKUP=299
+MSG_EN[$MSG_CREATING_ROOT_BACKUP]="RBK0299I: Creating backup of root partition in %s."
+MSG_DE[$MSG_CREATING_ROOT_BACKUP]="RBK0299I: Backup der Rootpartition wird in %s erstellt."
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -3758,7 +3761,7 @@ function supportsSymlinks() {	# directory
 }
 
 function isClone() {
-	[[ $BACKUPTYPE == $BACKUPTYPE_CLONE || $BACKUPTYPE == $BACKUPTYPE_CLONEINIT ]]
+	[[ $BACKUPTYPE == $BACKUPTYPE_CLONE || $BACKUPTYPE == $BACKUPTYPE_CLONEINIT || $BACKUPTYPE =~ clone ]]
 }
 
 function isMounted() { # dir
@@ -4546,6 +4549,7 @@ function cleanupBackupDirectory() {
 
 	if isClone; then
 		logExit
+		return
 	fi
 
 	logCommand "ls -la "$BACKUPTARGET_DIR""
@@ -5720,7 +5724,7 @@ function backupRsync() { # partition number (for partition based backup)
 
 function backupClone() {
 
-	local verbose target source 
+	local verbose target source
 
 	logEntry
 
@@ -5748,6 +5752,8 @@ function backupClone() {
 function initCloneDevice() {
 
 	logEntry
+
+	writeToConsole $MSG_LEVEL_MINIMAL $MSG_CREATING_PARTITIONS $RESTORE_DEVICE
 
 	sfdisk -d $BOOT_DEVICENAME > "$MODIFIED_SFDISK" 2>>$LOG_FILE
 
@@ -5807,7 +5813,7 @@ function initCloneDevice() {
 
 	writeToConsole $MSG_LEVEL_DETAILED $MSG_FORMATTING_FIRST_PARTITION "${restorePrefix}1"
 	mkfs.vfat ${restorePrefix}1 &>>$LOG_FILE
-	
+
 	writeToConsole $MSG_LEVEL_DETAILED $MSG_FORMATTING_SECOND_PARTITION "${restorePrefix}2"
 	mkfs.ext4 ${restorePrefix}2 &>>$LOG_FILE
 
@@ -5824,6 +5830,8 @@ function bootPartitionClone() { # bootdevice restoredevice
 	local targetBootPartition="$(getDevicePrefix "$2")1"
 	logItem "Boot clone - $sourceBootPartition - $targetBootPartition"
 
+	writeToConsole $MSG_LEVEL_MINIMAL $MSG_CREATING_BOOT_BACKUP $targetBootPartition
+
 	(( $VERBOSE )) && verbose="-v" || verbose=""
 
 	mkdir /mnt/raspiBackupSource &>> $LOG_FILE
@@ -5837,8 +5845,8 @@ function bootPartitionClone() { # bootdevice restoredevice
 		exitError $RC_CREATE_ERROR
 	fi
 
-	mount $sourceBootPartition /mnt/raspiBackupSource &>>$LOG_FILE
-	mount $targetBootPartition /mnt/raspiBackupTarget &>>$LOG_FILE
+	remount $sourceBootPartition /mnt/raspiBackupSource &>>$LOG_FILE
+	remount $targetBootPartition /mnt/raspiBackupTarget &>>$LOG_FILE
 	rsync $RSYNC_BACKUP_OPTIONS $verbose /mnt/raspiBackupSource/* /mnt/raspiBackupTarget
 
 	umount /mnt/raspiBackupSource &>> $LOG_FILE
@@ -5858,6 +5866,8 @@ function rootPartitionClone() { # rootdevice restoredevice
 
 	(( $VERBOSE )) && verbose="-v" || verbose=""
 
+	writeToConsole $MSG_LEVEL_MINIMAL $MSG_CREATING_ROOT_BACKUP $targetRootPartition
+
 	mkdir /mnt/raspiBackupSource &>> $LOG_FILE
 	if (( ! $? )); then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_DIRECTORY "/mnt/raspiBackupSource"
@@ -5869,8 +5879,8 @@ function rootPartitionClone() { # rootdevice restoredevice
 		exitError $RC_CREATE_ERROR
 	fi
 
-	mount $sourceRootPartition /mnt/raspiBackupSource &>>$LOG_FILE
-	mount $targetRootPartition /mnt/raspiBackupTarget &>>$LOG_FILE
+	remount $sourceRootPartition /mnt/raspiBackupSource &>>$LOG_FILE
+	remount $targetRootPartition /mnt/raspiBackupTarget &>>$LOG_FILE
 	rsync $RSYNC_BACKUP_OPTIONS $verbose /mnt/raspiBackupSource/* /mnt/raspiBackupTarget
 
 	umount /mnt/raspiBackupSource &>> $LOG_FILE
@@ -9709,7 +9719,10 @@ if (( ! $INCLUDE_ONLY )); then
 # set positional arguments in argument list $@
 set -- "$PARAMS"
 
-isClone && RESTORE=0
+if isClone; then
+	RESTORE=0
+	LOG_OUTPUT=$LOG_OUTPUT_HOME
+fi
 
 if (( $RESTORE )); then
 	rstFileName="${LOG_FILE/$LOGFILE_EXT/$LOGFILE_RESTORE_EXT}"
@@ -9718,9 +9731,8 @@ if (( $RESTORE )); then
 	rstFileName="${MSG_FILE/$MSGFILE_EXT/$MSGFILE_RESTORE_EXT}"
 	MSG_FILE="$rstFileName"
 	MSGFILE_EXT="$MSGFILE_RESTORE_EXT"
-fi
 
-if (( ! $RESTORE )); then
+else
 	exlock_now
 	if (( $? )); then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_INSTANCE_ACTIVE
@@ -9826,8 +9838,6 @@ else
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_CLONE_DEVICE_NOT_VALID "$RESTORE_DEVICE"
 		exitError $RC_MISC_ERROR
 	fi
-	
-	LOG_OUTPUT=$LOG_OUTPUT_HOME
 fi
 
 _prepare_locking
