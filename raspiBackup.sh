@@ -1942,9 +1942,18 @@ MSG_DE[$MSG_CLONE_DEVICE_NOT_VALID]="RBK0297E: Das Clonegerät %s ist kein gült
 MSG_MISSING_CLONEDEVICE_OPTION=298
 MSG_EN[$MSG_MISSING_CLONEDEVICE_OPTION]="RBK0299E: Backuptype clone requires also option -d."
 MSG_DE[$MSG_MISSING_CLONEDEVICE_OPTION]="RBK0298E: Backuptyp clone erfordert auch Option -d."
-MSG_CREATING_ROOT_BACKUP=299
-MSG_EN[$MSG_CREATING_ROOT_BACKUP]="RBK0299I: Creating backup of root partition in %s."
-MSG_DE[$MSG_CREATING_ROOT_BACKUP]="RBK0299I: Backup der Rootpartition wird in %s erstellt."
+MSG_CREATING_ROOT_CLONE=299
+MSG_EN[$MSG_CREATING_ROOT_CLONE]="RBK0299I: Creating clone of root partition on %s."
+MSG_DE[$MSG_CREATING_ROOT_CLONE]="RBK0299I: Clone der Rootpartition wird auf %s erstellt."
+MSG_CREATING_BOOT_CLONE=300
+MSG_EN[$MSG_CREATING_BOOT_CLONE]="RBK0300I: Creating clone of boot partition on %s."
+MSG_DE[$MSG_CREATING_BOOT_CLONE]="RBK0300I: Clone der Bootpartition wird auf %s erstellt."
+MSG_SYNCING_ROOT_CLONE=301
+MSG_EN[$MSG_SYNCING_ROOT_CLONE]="RBK0301I: Syning clone of root partition on %s."
+MSG_DE[$MSG_SYNCING_ROOT_CLONE]="RBK0301I: Synchonisiere Clone der Rootpartition auf %s erstellt."
+MSG_SYNCING_BOOT_CLONE=302
+MSG_EN[$MSG_SYNCING_BOOT_CLONE]="RBK0302I: Syncing clone of boot partition on %s."
+MSG_DE[$MSG_SYNCING_BOOT_CLONE]="RBK0302I: Synchronisiere Clone der Bootpartition auf %s erstellt."
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -5833,7 +5842,11 @@ function bootPartitionClone() { # bootdevice restoredevice
 	local targetBootPartition="$(getDevicePrefix "$2")1"
 	logItem "Boot clone - $sourceBootPartition - $targetBootPartition"
 
-	writeToConsole $MSG_LEVEL_MINIMAL $MSG_CREATING_BOOT_BACKUP $targetBootPartition
+	if [[ $BACKUPTYPE == $BACKUPTYPE_CLONEINIT ]]; then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_CREATING_BOOT_CLONE $targetBootPartition
+	else
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_SYNCING_BOOT_CLONE $targetBootPartitionfi
+	fi
 
 	(( $VERBOSE )) && verbose="-v" || verbose=""
 
@@ -5869,7 +5882,11 @@ function rootPartitionClone() { # rootdevice restoredevice
 
 	(( $VERBOSE )) && verbose="-v" || verbose=""
 
-	writeToConsole $MSG_LEVEL_MINIMAL $MSG_CREATING_ROOT_BACKUP $targetRootPartition
+	if [[ $BACKUPTYPE == $BACKUPTYPE_CLONEINIT ]]; then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_CREATING_ROOT_CLONE $targetRootPartition
+	else
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_SYNCING_ROOT_CLONE $targetRootPartition
+	fi
 
 	mkdir /mnt/raspiBackupSource &>> $LOG_FILE
 	if (( ! $? )); then
@@ -5884,7 +5901,16 @@ function rootPartitionClone() { # rootdevice restoredevice
 
 	remount $sourceRootPartition /mnt/raspiBackupSource &>>$LOG_FILE
 	remount $targetRootPartition /mnt/raspiBackupTarget &>>$LOG_FILE
-	rsync $RSYNC_BACKUP_OPTIONS $verbose /mnt/raspiBackupSource/* /mnt/raspiBackupTarget
+	rsync $RSYNC_BACKUP_OPTIONS $verbose \
+			--exclude '.gvfs' \
+			--exclude '/dev/*' \
+			--exclude '/mnt/raspi*/*' \
+			--exclude '/proc/*' \
+			--exclude '/run/*' \
+			--exclude '/sys/*' \
+			--exclude '/tmp/*' \
+			--exclude 'lost\+found/*' \
+			/mnt/raspiBackupSource/* /mnt/raspiBackupTarget
 
 	umount /mnt/raspiBackupSource &>> $LOG_FILE
 	umount /mnt/raspiBackupTarget &>> $LOG_FILE
