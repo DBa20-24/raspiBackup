@@ -428,6 +428,7 @@ RC_CLEANUP_ERROR=140
 RC_EXTENSION_ERROR=141
 RC_UNPROTECTED_CONFIG=142
 RC_NOT_SUPPORTED=143
+RC_CLONE_FAILED=144
 
 tty -s
 INTERACTIVE=$((!$?))
@@ -1963,6 +1964,9 @@ MSG_DE[$MSG_SYNCING_CLONE]="RBK0304I: Synchronisiere Clone auf dem Gerät %s."
 MSG_UMOUNT_FAILED=305
 MSG_EN[$MSG_UMOUNT_FAILED]="RBK0305E: Umount of %s failed with RC %s."
 MSG_DE[$MSG_UMOUNT_FAILED]="RBK0305E: Umount von %s fehlerhaft mit RC %s."
+MSG_CLONE_FAILED=306
+MSG_EN[$MSG_CLONE_FAILED]="RBK0306E: Clone failed. Check previous error messages for details."
+MSG_DE[$MSG_CLONE_FAILED]="RBK0306E: Clone fehlerhaft beendet. Siehe vorhergehende Fehlermeldungen."
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -2224,7 +2228,7 @@ function logFinish() {
 			rm -f "$FINISH_LOG_FILE" &>> "$DEST_LOGFILE"
 		fi
 
-		if (( !$INCLUDE_ONLY )); then
+		if (( ! $INCLUDE_ONLY )); then
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_SAVED_LOG "$LOG_FILE"
 		fi
 
@@ -4880,6 +4884,8 @@ function cleanup() { # trap
 		if (( $rc != $RC_CTRLC )); then
 			if (( $RESTORE )); then
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORE_FAILED
+			elif isClone; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_CLONE_FAILED
 			else
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_BACKUP_FAILED
 			fi
@@ -5786,9 +5792,25 @@ function backupClone() {
 	fi
 
 	cloneBootPartition "$BOOT_DEVICE" "$RESTORE_DEVICE"
+	if (( $rc )); then
+		logExit "$rc"
+		return $rc
+	fi
 	cloneRootPartition "$BOOT_DEVICE" "$RESTORE_DEVICE"
+	if (( $rc )); then
+		logExit "$rc"
+		return $rc
+	fi
 	updateUUIDs
+	if (( $rc )); then
+		logExit "$rc"
+		return $rc
+	fi
 	synchronizeCmdlineAndfstab
+	if (( $rc )); then
+		logExit "$rc"
+		return $rc
+	fi
 
 	logExit  "$rc"
 
@@ -5922,7 +5944,13 @@ function cloneBootPartition() { # bootdevice restoredevice
 		exitError $RC_MOUNT_FAILED
 	fi
 
-	rsync $RSYNC_CLONE_OPTIONS $verbose $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource/* $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget
+	local cmd="rsync $RSYNC_CLONE_OPTIONS $verbose $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource/* $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget"
+	executeRsync "$cmd"
+	rc=$?
+
+	if (( $rc )); then
+		return
+	fi
 
 	umount $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource &>> $LOG_FILE
 	rc=$?
@@ -5991,7 +6019,7 @@ function cloneRootPartition() { # rootdevice restoredevice
 		exitError $RC_MOUNT_FAILED
 	fi
 
-	rsync $RSYNC_CLONE_OPTIONS $verbose \
+	local cmd="rsync $RSYNC_CLONE_OPTIONS $verbose \
 			$excludeSwapfile \
 			--exclude '.gvfs' \
 			--exclude '/dev/*' \
@@ -6001,7 +6029,14 @@ function cloneRootPartition() { # rootdevice restoredevice
 			--exclude '/sys/*' \
 			--exclude '/tmp/*' \
 			--exclude 'lost\+found/*' \
-			$TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource/* $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget
+			$TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource/* $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget"
+
+	executeRsync "$cmd"
+	rc=$?
+
+	if (( $rc )); then
+		return
+	fi
 
 	umount $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource &>> $LOG_FILE
 	if (( $rc != 0 )); then
@@ -6598,7 +6633,7 @@ function backup() {
 						;;
 				esac
 
-				if [[ $rc != 0 ]]; then
+				if (( $rc != 0 )); then
 					writeToConsole $MSG_LEVEL_MINIMAL $MSG_BACKUP_PROGRAM_ERROR $BACKUPTYPE $rc
 					exitError $RC_NATIVE_BACKUP_FAILED
 				fi
