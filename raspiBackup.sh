@@ -1960,6 +1960,9 @@ MSG_DE[$MSG_CLONE_ABORTED]="RBK0303I: Clone abgebrochen."
 MSG_SYNCING_CLONE=304
 MSG_EN[$MSG_SYNCING_CLONE]="RBK0304I: Syncing clone on device %s."
 MSG_DE[$MSG_SYNCING_CLONE]="RBK0304I: Synchronisiere Clone auf dem Gerät %s."
+MSG_UMOUNT_FAILED=305
+MSG_EN[$MSG_UMOUNT_FAILED]="RBK0305E: Umount of %s failed with RC %s."
+MSG_DE[$MSG_UMOUNT_FAILED]="RBK0305E: Umount von %s fehlerhaft mit RC %s."
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -3932,7 +3935,7 @@ function setupEnvironment() {
 	logEntry
 
 	if (( ! $RESTORE )) && ! isClone; then
-	
+
 		ZIP_BACKUP_TYPE_INVALID=0		# logging not enabled right now, invalid backuptype will be handled later
 		if (( $ZIP_BACKUP )); then
 			if [[ $BACKUPTYPE == $BACKUPTYPE_DD || $BACKUPTYPE == $BACKUPTYPE_TAR ]]; then
@@ -5133,7 +5136,7 @@ function cleanupTempFiles() {
 		umount $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource &>> $LOG_FILE
 		rmdir $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource &>> $LOG_FILE
 	fi
-	if [[ -e $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget ]]; then		
+	if [[ -e $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget ]]; then
 		umount $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget &>> $LOG_FILE
 		rmdir $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget &>> $LOG_FILE
 	fi
@@ -5764,7 +5767,7 @@ function backupClone() {
 	if [[ $BACKUPTYPE == $BACKUPTYPE_CLONEINIT ]]; then
 		if (( $INTERACTIVE )); then
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_REPARTITION_WARNING $RESTORE_DEVICE
-		
+
 			if ! askYesNo; then
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_CLONE_ABORTED
 				exitError $RC_RESTORE_FAILED
@@ -5774,7 +5777,7 @@ function backupClone() {
 	else
 		if (( $INTERACTIVE )); then
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_SYNCING_CLONE $RESTORE_DEVICE
-		
+
 			if ! askYesNo; then
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_CLONE_ABORTED
 				exitError $RC_RESTORE_FAILED
@@ -5798,6 +5801,11 @@ function cloneInitDevice() {
 	writeToConsole $MSG_LEVEL_MINIMAL $MSG_CREATING_PARTITIONS $RESTORE_DEVICE
 
 	sfdisk -d $BOOT_DEVICENAME > "$MODIFIED_SFDISK" 2>>$LOG_FILE
+	local rc=$?
+	if [ $rc != 0 ]; then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_COLLECT_PARTITIONINFO "sfdisk" "$rc"
+		exitError $RC_COLLECT_PARTITIONS_FAILED
+	fi
 
 	logCommand "cat $MODIFIED_SFDISK"
 
@@ -5855,9 +5863,19 @@ function cloneInitDevice() {
 
 	writeToConsole $MSG_LEVEL_DETAILED $MSG_FORMATTING_FIRST_PARTITION "${restorePrefix}1"
 	mkfs.vfat ${restorePrefix}1 &>>$LOG_FILE
+	rc=$?
+	if (( $rc != 0 )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_IMG_BOOT_CREATE_PARTITION_FAILED "$rc"
+		exitError $RC_CREATE_PARTITIONS_FAILED
+	fi
 
 	writeToConsole $MSG_LEVEL_DETAILED $MSG_FORMATTING_SECOND_PARTITION "${restorePrefix}2"
 	mkfs.ext4 ${restorePrefix}2 &>>$LOG_FILE
+	rc=$?
+	if (( $rc != 0 )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_IMG_ROOT_CREATE_PARTITION_FAILED "$rc"
+		exitError $RC_CREATE_PARTITIONS_FAILED
+	fi
 
 	logExit
 }
@@ -5892,11 +5910,33 @@ function cloneBootPartition() { # bootdevice restoredevice
 	fi
 
 	mount $sourceBootPartition $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource &>>$LOG_FILE
+	rc=$?
+	if (( $rc != 0 )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MOUNT_CHECK_ERROR "$sourceBootPartition" "$TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource" "$rc"
+		exitError $RC_MOUNT_FAILED
+	fi
+
 	mount $targetBootPartition $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget &>>$LOG_FILE
+	if (( $rc != 0 )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MOUNT_CHECK_ERROR "$targetBootPartition" "$TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget" "$rc"
+		exitError $RC_MOUNT_FAILED
+	fi
+
 	rsync $RSYNC_CLONE_OPTIONS $verbose $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource/* $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget
 
 	umount $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource &>> $LOG_FILE
+	rc=$?
+	if (( $rc != 0 )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UMOUNT_FAILED "$TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource" "$rc"
+		exitError $RC_MOUNT_FAILED
+	fi
+
 	umount $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget &>> $LOG_FILE
+	rc=$?
+	if (( $rc != 0 )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UMOUNT_FAILED "$TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource" "$rc"
+		exitError $RC_MOUNT_FAILED
+	fi
 
 	logExit
 }
@@ -5938,7 +5978,19 @@ function cloneRootPartition() { # rootdevice restoredevice
 	fi
 
 	mount $sourceRootPartition $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource &>>$LOG_FILE
+	rc=$?
+	if (( $rc != 0 )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MOUNT_CHECK_ERROR "$sourceBootPartition" "$TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource" "$rc"
+		exitError $RC_MOUNT_FAILED
+	fi
+
 	mount $targetRootPartition $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget &>>$LOG_FILE
+	rc=$?
+	if (( $rc != 0 )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MOUNT_CHECK_ERROR "$targetBootPartition" "$TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget" "$rc"
+		exitError $RC_MOUNT_FAILED
+	fi
+
 	rsync $RSYNC_CLONE_OPTIONS $verbose \
 			$excludeSwapfile \
 			--exclude '.gvfs' \
@@ -5952,7 +6004,16 @@ function cloneRootPartition() { # rootdevice restoredevice
 			$TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource/* $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget
 
 	umount $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource &>> $LOG_FILE
+	if (( $rc != 0 )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UMOUNT_FAILED "$TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource" "$rc"
+		exitError $RC_MOUNT_FAILED
+	fi
+
 	umount $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget &>> $LOG_FILE
+	if (( $rc != 0 )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UMOUNT_FAILED "$TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget" "$rc"
+		exitError $RC_MOUNT_FAILED
+	fi
 
 	logExit
 }
