@@ -1959,14 +1959,17 @@ MSG_CLONE_ABORTED=303
 MSG_EN[$MSG_CLONE_ABORTED]="RBK0303I: Clone aborted."
 MSG_DE[$MSG_CLONE_ABORTED]="RBK0303I: Clone abgebrochen."
 MSG_SYNCING_CLONE=304
-MSG_EN[$MSG_SYNCING_CLONE]="RBK0304I: Syncing clone on device %s."
-MSG_DE[$MSG_SYNCING_CLONE]="RBK0304I: Synchronisiere Clone auf dem Gerät %s."
+MSG_EN[$MSG_SYNCING_CLONE]="RBK0304W: Syncronize clone on device %s."
+MSG_DE[$MSG_SYNCING_CLONE]="RBK0304W: Synchronisiere Clone auf dem Gerät %s."
 MSG_UMOUNT_FAILED=305
 MSG_EN[$MSG_UMOUNT_FAILED]="RBK0305E: Umount of %s failed with RC %s."
 MSG_DE[$MSG_UMOUNT_FAILED]="RBK0305E: Umount von %s fehlerhaft mit RC %s."
 MSG_CLONE_FAILED=306
 MSG_EN[$MSG_CLONE_FAILED]="RBK0306E: Clone failed. Check previous error messages for details."
 MSG_DE[$MSG_CLONE_FAILED]="RBK0306E: Clone fehlerhaft beendet. Siehe vorhergehende Fehlermeldungen."
+MSG_INIT_CLONE=307
+MSG_EN[$MSG_INIT_CLONE]="RBK0307W: Initialize and syncronize clone on device %s."
+MSG_DE[$MSG_INIT_CLONE]="RBK0307W: Initialisiere und clone auf das Gerät %s."
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -5139,12 +5142,25 @@ function cleanupTempFiles() {
 	fi
 
 	if [[ -e $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource ]]; then
+		logItem "Umounting and removing $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource"
 		umount $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource &>> $LOG_FILE
 		rmdir $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupSource &>> $LOG_FILE
 	fi
 	if [[ -e $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget ]]; then
+		logItem "Umounting and removing $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget"
 		umount $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget &>> $LOG_FILE
 		rmdir $TEMPORARY_MOUNTPOINT_ROOT/raspiBackupTarget &>> $LOG_FILE
+	fi
+
+	if [[ -e $TEMPORARY_MOUNTPOINT_ROOT/boot ]]; then
+		logItem "Umounting and removing $TEMPORARY_MOUNTPOINT_ROOT/boot"
+		umount $TEMPORARY_MOUNTPOINT_ROOT/boot &>> $LOG_FILE
+		rmdir $TEMPORARY_MOUNTPOINT_ROOT/boot &>> $LOG_FILE
+	fi
+	if [[ -e $TEMPORARY_MOUNTPOINT_ROOT/root ]]; then
+		logItem "Umounting and removing $TEMPORARY_MOUNTPOINT_ROOT/root"
+		umount $TEMPORARY_MOUNTPOINT_ROOT/root &>> $LOG_FILE
+		rmdir $TEMPORARY_MOUNTPOINT_ROOT/root &>> $LOG_FILE
 	fi
 
 	logExit
@@ -5772,8 +5788,9 @@ function backupClone() {
 
 	if [[ $BACKUPTYPE == $BACKUPTYPE_CLONEINIT ]]; then
 		if (( $INTERACTIVE )); then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_REPARTITION_WARNING $RESTORE_DEVICE
-
+			local info="$(lsblk -o NAME,FSTYPE,LABEL,PARTUUID,FSAVAIL,FSUSED,FSUSE%,MOUNTPOINTS)"
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_INIT_CLONE $RESTORE_DEVICE
+			echo "$info"
 			if ! askYesNo; then
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_CLONE_ABORTED
 				exitError $RC_RESTORE_FAILED
@@ -5782,8 +5799,9 @@ function backupClone() {
 		cloneInitDevice
 	else
 		if (( $INTERACTIVE )); then
+			local info="$(lsblk -o NAME,FSTYPE,LABEL,PARTUUID,FSAVAIL,FSUSED,FSUSE%,MOUNTPOINTS)"
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_SYNCING_CLONE $RESTORE_DEVICE
-
+			echo "$info"
 			if ! askYesNo; then
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_CLONE_ABORTED
 				exitError $RC_RESTORE_FAILED
