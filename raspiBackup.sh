@@ -1970,6 +1970,12 @@ MSG_DE[$MSG_CLONE_FAILED]="RBK0306E: Clone fehlerhaft beendet. Siehe vorhergehen
 MSG_INIT_CLONE=307
 MSG_EN[$MSG_INIT_CLONE]="RBK0307W: Initialize and syncronize clone on device %s."
 MSG_DE[$MSG_INIT_CLONE]="RBK0307W: Initialisiere und clone auf das Gerät %s."
+MSG_CLONE_PARTITIONING_MISMATCH=308
+MSG_EN[$MSG_CLONE_PARTITIONING_MISMATCH]="RBK0308E: Clone device %s has partitioning. Use cloneint first."
+MSG_DE[$MSG_CLONE_PARTITIONING_MISMATCH]="RBK0308E: Clonegerät %s hat inkompatible Partitionen. Nutze erst cloneinit."
+MSG_CLONE_PARTITIONING_INFO=309
+MSG_EN[$MSG_CLONE_PARTITIONING_INFO]="RBK0309I: Known partitions on the system:"
+MSG_DE[$MSG_CLONE_PARTITIONING_INFO]="RBK0309I: Bekannte Partitionen auf dem System:"
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -3807,6 +3813,16 @@ function isMounted() { # dir
 	fi
 	logExit "$rc"
 	return $rc
+}
+
+function getPartitionFs() { # device partitionNumber
+
+	logEntry "$1 - $2"
+
+	local pfs="$(parted -m "$1" unit s print | grep "^$2" | cut -f 5 -d :)"
+	echo "$pfs"	
+	logExit "$pfs"
+
 }
 
 function getFsType() { # file or path
@@ -5783,13 +5799,11 @@ function backupClone() {
 	verbose="--info=NAME0"
 	(( $VERBOSE )) && verbose="-v"
 
-	target="\"${BACKUPTARGET_DIR}\""
-	source="/"
-
 	if [[ $BACKUPTYPE == $BACKUPTYPE_CLONEINIT ]]; then
 		if (( $INTERACTIVE )); then
 			local info="$(lsblk -o NAME,FSTYPE,LABEL,PARTUUID,FSAVAIL,FSUSED,FSUSE%,MOUNTPOINTS)"
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_INIT_CLONE $RESTORE_DEVICE
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_CLONE_PARTITIONING_INFO
 			echo "$info"
 			if ! askYesNo; then
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_CLONE_ABORTED
@@ -5798,9 +5812,15 @@ function backupClone() {
 		fi
 		cloneInitDevice
 	else
+		if ! cloneCheckPartitioning; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_CLONE_PARTITIONING_MISMATCH $RESTORE_DEVICE
+			exitError $RC_CLONE_FAILED
+		fi		
+
 		if (( $INTERACTIVE )); then
 			local info="$(lsblk -o NAME,FSTYPE,LABEL,PARTUUID,FSAVAIL,FSUSED,FSUSE%,MOUNTPOINTS)"
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_SYNCING_CLONE $RESTORE_DEVICE
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_CLONE_PARTITIONING_INFO
 			echo "$info"
 			if ! askYesNo; then
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_CLONE_ABORTED
@@ -5834,6 +5854,30 @@ function backupClone() {
 
 }
 
+function cloneCheckPartitioning() {
+
+	logEntry
+
+	local srcBootFS="$(getPartitionFs $BOOT_DEVICENAME 1)"
+	local srcRootFS="$(getPartitionFs $BOOT_DEVICENAME 2)"
+
+	local tgtBootFS="$(getPartitionFs $RESTORE_DEVICE 1)"
+	local tgtRootFS="$(getPartitionFs $RESTORE_DEVICE 2)"
+
+	local srcBootPrefix="$(getDevicePrefix $BOOT_DEVICE)"
+	local tgtBootPrefix="$(getDevicePrefix $RESTORE_DEVICE)"
+
+	local srcBootSize="$(sudo sfdisk -l $BOOT_DEVICENAME | grep "^${srcBootPrefix}1" | awk '{ print $5 }')"
+	local tgtBootSize="$(sudo sfdisk -l $RESTORE_DEVICE | grep "^${tgtBootPrefix}1" | awk '{ print $5 }')"
+
+	[[ "$srcBootFS" == "$tgtBootFS" && "$srcRootFS" == "$tgtRootFS" && "$srcBootSize" == "$tgtBootSize" ]]
+
+	local rc=$?
+
+	logExit $rc
+	return $rc
+}
+
 function cloneInitDevice() {
 
 	logEntry
@@ -5852,6 +5896,10 @@ function cloneInitDevice() {
 	local sourceSDSize=$(calcSumSizeFromSFDISK "$MODIFIED_SFDISK")
 	local targetSDSize=$(blockdev --getsize64 $RESTORE_DEVICE)
 	logItem "sourceSDSize: $sourceSDSize - targetSDSize: $targetSDSize"
+
+	if (( sourceSDSize > targetSDSize )); then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_WARNING "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
+	fi
 
 	if (( sourceSDSize != targetSDSize )); then
 
