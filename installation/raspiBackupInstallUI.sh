@@ -13,7 +13,7 @@
 #
 #######################################################################################################################
 #
-#    Copyright (c) 2015-2023 framp at linux-tips-and-tricks dot de
+#    Copyright (c) 2015-2024 framp at linux-tips-and-tricks dot de
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -301,6 +301,7 @@ CONFIG_SYSTEMD_HOUR=$CONFIG_CRON_HOUR
 CONFIG_SYSTEMD_MINUTE=$CONFIG_CRON_MINUTE
 CONFIG_SYSTEMD_DAY="1" # Sun
 CONFIG_MAIL_PROGRAM="mail"
+CONFIG_RESTORE_DEVICE=""
 CONFIG_EMAIL=""
 CONFIG_RESIZE_ROOTFS="1"
 
@@ -1520,6 +1521,12 @@ MENU_FI[$MENU_CONFIG_TYPE_RSYNC]='"rsync" "rsync-varmuuskopio ja hardlinkkien k�
 MENU_FR[$MENU_CONFIG_TYPE_RSYNC]='"rsync" "Sécuriser avec rsync en utilisant si possible des liens physiques"'
 MENU_ZH[$MENU_CONFIG_TYPE_RSYNC]='"rsync" "使用rsync备份,如果可能,使用硬链接"'
 
+# no NLS 
+MENU_CONFIG_TYPE_CLONE=$((MCNT++))
+MENU_EN[$MENU_CONFIG_TYPE_CLONE]='"clone" "Clone to another device"'
+MENU_DE[$MENU_CONFIG_TYPE_CLONE]='"clone" "Klone auf ein anderes Gerät"'
+
+# NLS
 MENU_UNINSTALL_UNINSTALL=$((MCNT++))
 MENU_EN[$MENU_UNINSTALL_UNINSTALL]='"U1" "Uninstall $RASPIBACKUP_NAME"'
 MENU_DE[$MENU_UNINSTALL_UNINSTALL]='"U1" "Lösche $RASPIBACKUP_NAME"'
@@ -2283,7 +2290,7 @@ function getStartStopCommands() { # listOfServicesToStop pcommandvarname scomman
 function parseConfig() {
 	logEntry
 
-	IFS="" matches=$(grep -E "DEFAULT_(MSG_LEVEL|KEEPBACKUPS|BACKUPPATH|BACKUPTYPE|ZIP_BACKUP|PARTITIONBASED_BACKUP|PARTITIONS_TO_BACKUP|LANGUAGE|STARTSERVICES|STOPSERVICES|EMAIL|MAIL_PROGRAM|SMART_RECYCLE|SMART_RECYCLE_DRYRUN|SMART_RECYCLE_OPTIONS|RESIZE_FS)=" "$CONFIG_ABS_FILE")
+	IFS="" matches=$(grep -E "DEFAULT_(MSG_LEVEL|KEEPBACKUPS|BACKUPPATH|BACKUPTYPE|ZIP_BACKUP|PARTITIONBASED_BACKUP|PARTITIONS_TO_BACKUP|LANGUAGE|STARTSERVICES|STOPSERVICES|EMAIL|MAIL_PROGRAM|SMART_RECYCLE|SMART_RECYCLE_DRYRUN|SMART_RECYCLE_OPTIONS|RESIZE_FS|RESTORE_DEVICE)=" "$CONFIG_ABS_FILE")
 	while IFS="=" read key value; do
 		key=${key//\"/}
 		key=${key/DEFAULT/CONFIG}
@@ -2327,6 +2334,7 @@ function config_update_execute() {
 	logItem "eMail: $CONFIG_EMAIL"
 	logItem "mailProgram: $CONFIG_MAIL_PROGRAM"
 	logItem "Resize: $CONFIG_RESIZE_ROOTFS"
+	logItem "Restoredevice: $CONFIG_RESTORE_DEVICE"
 
 	sed -i -E "s/^(#?\s?)?DEFAULT_LANGUAGE=.*\$/DEFAULT_LANGUAGE=\"$CONFIG_LANGUAGE\"/" "$CONFIG_ABS_FILE"
 	sed -i -E "s/^(#?\s?)?DEFAULT_PARTITIONBASED_BACKUP=.*\$/DEFAULT_PARTITIONBASED_BACKUP=\"$CONFIG_PARTITIONBASED_BACKUP\"/" "$CONFIG_ABS_FILE"
@@ -2340,6 +2348,7 @@ function config_update_execute() {
 	sed -i -E "s/^(#?\s?)?DEFAULT_MSG_LEVEL=.*$/DEFAULT_MSG_LEVEL=\"$CONFIG_MSG_LEVEL\"/" "$CONFIG_ABS_FILE"
 	sed -i -E "s/^(#?\s?)?DEFAULT_EMAIL=.*$/DEFAULT_EMAIL=\"$CONFIG_EMAIL\"/" "$CONFIG_ABS_FILE"
 	sed -i -E "s/^(#?\s?)?DEFAULT_MAIL_PROGRAM=.*$/DEFAULT_MAIL_PROGRAM=\"$CONFIG_MAIL_PROGRAM\"/" "$CONFIG_ABS_FILE"
+	sed -i -E "s/^(#?\s?)?DEFAULT_RESTORE_DEVICE=.*$/DEFAULT_RESTORE_DEVICE=\"$CONFIG_RESTORE_DEVICE\"/" "$CONFIG_ABS_FILE"
 	local f=$(sed 's_/_\\/_g' <<< "$CONFIG_BACKUPPATH")
 	sed -i -E "s/^(#?\s?)?DEFAULT_BACKUPPATH=.*$/DEFAULT_BACKUPPATH=\"$f\"/" "$CONFIG_ABS_FILE"
 
@@ -3440,6 +3449,7 @@ function config_backuptype_do() {
 	local dd_=off
 	local tar_=off
 	local rsync_=off
+	local clone_=off
 	local old="$CONFIG_BACKUPTYPE"
 
 	logEntry "$old"
@@ -3447,10 +3457,12 @@ function config_backuptype_do() {
 	getMenuText $MENU_CONFIG_TYPE_RSYNC m1
 	getMenuText $MENU_CONFIG_TYPE_TAR m2
 	getMenuText $MENU_CONFIG_TYPE_DD m3
+	getMenuText $MENU_CONFIG_TYPE_CLONE m4
 
 	local s1="${m1[0]}"
 	local s2="${m2[0]}"
 	local s3="${m3[0]}"
+	local s4="${m4[0]}"
 
 	local o1="$(getMessageText $BUTTON_OK)"
 	local c1="$(getMessageText $BUTTON_CANCEL)"
@@ -3459,6 +3471,7 @@ function config_backuptype_do() {
 		dd) dd_=on ;;
 		tar) tar_=on ;;
 		rsync) rsync_=on ;;
+		clone) clone_=on ;;
 	esac
 
 	getMenuText $MENU_CONFIG_TYPE tt
@@ -3470,14 +3483,16 @@ function config_backuptype_do() {
 	local o1="$(getMessageText $BUTTON_OK)"
 	local d="$(getMessageText $DESCRIPTION_BACKUPTYPE)"
 
-	ANSWER=$(whiptail --notags --radiolist "$d" --title "${tt[1]}" --ok-button "$o1" --cancel-button "$c1" $WT_HEIGHT $WT_WIDTH 3 \
+	ANSWER=$(whiptail --notags --radiolist "$d" --title "${tt[1]}" --ok-button "$o1" --cancel-button "$c1" $WT_HEIGHT $WT_WIDTH 4 \
 		"${m1[@]}" "$rsync_" \
 		"${m2[@]}" "$tar_" \
 		"${m3[@]}" "$dd_" \
+		"${m4[@]}" "$clone_" \
 		3>&1 1>&2 2>&3)
 	if [ $? -eq 0 ]; then
 		logItem "Answer: $ANSWER"
 		case "$ANSWER" in
+			$s4) CONFIG_BACKUPTYPE="clone" ;;
 			$s3) CONFIG_BACKUPTYPE="dd" ;;
 			$s2) CONFIG_BACKUPTYPE="tar" ;;
 			$s1) CONFIG_BACKUPTYPE="rsync"
