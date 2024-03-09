@@ -1003,6 +1003,10 @@ MSG_FI[$DESCRIPTION_EMAIL]="Syötä sähköpostiosoite, johon ilmoitukset lähet
 MSG_FR[$DESCRIPTION_EMAIL]="Saisissez l'adresse e-mail pour recevoir les notifications. Aucune adresse e-mail désactive les notifications."
 MSG_ZH[$DESCRIPTION_EMAIL]="输入邮件地址，留空则禁用邮件通知."
 
+DESCRIPTION_RESTORE_DEVICE=$((SCNT++))
+MSG_EN[$DESCRIPTION_RESTORE_DEVICE]="Enter the device to clone the system. Example: /dev/sda."
+MSG_DE[$DESCRIPTION_RESTORE_DEVICE]="Gibt das Gerät ein wohin das System gecloned werden soll. (z.B. /dev/sda)."
+
 TITLE_ERROR=$((SCNT++))
 MSG_EN[$TITLE_ERROR]="Error"
 MSG_DE[$TITLE_ERROR]="Fehler"
@@ -1065,6 +1069,10 @@ MSG_DE[$MSG_INVALID_EMAIL]="Ungültige eMail Adresse %1"
 MSG_FI[$MSG_INVALID_EMAIL]="Virheellinen sähköpostiosoite %1"
 MSG_FR[$MSG_INVALID_EMAIL]="Adresse e-mail invalide %1"
 MSG_ZH[$MSG_INVALID_EMAIL]="邮箱地址无效 %1"
+
+MSG_INVALID_RESTORE_DEVICE=$((SCNT++))
+MSG_EN[$MSG_INVALID_RESTORE_DEVICE]="Invalid clone device %1. Examples: /dev/sda, /dev/mmcblk0 or /dev/nvme0n1,"
+MSG_DE[$MSG_INVALID_RESTORE_DEVICE]="Ungültiges Klonegerät %1. Beispiele: /dev/sda, /dev/mmcblk0 oder /dev/nvme0n1"
 
 MSG_LOCAL_BACKUPPATH=$((SCNT++))
 MSG_EN[$MSG_LOCAL_BACKUPPATH]="Backup would be stored on SD card"
@@ -1415,6 +1423,10 @@ MENU_DE[$MENU_CONFIG_EMAIL]='"C8" "eMail Benachrichtigung"'
 MENU_FI[$MENU_CONFIG_EMAIL]='"C8" "Sähköposti-ilmoitus"'
 MENU_FR[$MENU_CONFIG_EMAIL]='"C8" "Notification par courrier électronique"'
 MENU_ZH[$MENU_CONFIG_EMAIL]='"C8" "邮件通知"'
+
+MENU_CONFIG_RESTORE_DEVICE=$((MCNT++))
+MENU_EN[$MENU_CONFIG_RESTORE_DEVICE]='"C11" "Clone configuration"'
+MENU_DE[$MENU_CONFIG_RESTORE_DEVICE]='"C11" "Klone Konfiguration"'
 
 MENU_CONFIG_REGULAR=$((MCNT++))
 MENU_EN[$MENU_CONFIG_REGULAR]='"C9" "Regular backup"'
@@ -3349,6 +3361,53 @@ function config_systemdtime_do() {
 
 }
 
+function config_restore_device_do() {
+
+	getMenuText $MENU_CONFIG_RESTORE_DEVICE tt
+	c1="$(getMessageText $BUTTON_CANCEL)"
+	o1="$(getMessageText $BUTTON_OK)"
+
+	local current="$CONFIG_RESTORE_DEVICE"
+	local oldDevice="$current"
+
+	local d="$(getMessageText $DESCRIPTION_RESTORE_DEVICE)"
+
+	while :; do
+		ANSWER=$(whiptail --inputbox "$d" --title "${tt[1]}" $ROWS_MENU $WINDOW_COLS "$current" --ok-button "$o1" --cancel-button "$c1" 3>&1 1>&2 2>&3)
+		if [ $? -eq 0 ]; then
+			logItem "Answer: $ANSWER"
+			current="$ANSWER"
+			if [[ -n "$current" ]]; then
+				if ! [[ "$current" =~ ^/dev/(sd[a-z]|mmcblk[0-9]|nvme[0-9]n[0-9])$ ]]; then
+					local m="$(getMessageText $MSG_INVALID_RESTORE_DEVICE "$current")"
+					local t=$(center $WINDOW_COLS "$m")
+					local ttm="$(getMessageText $TITLE_VALIDATIONERROR)"
+					whiptail --msgbox "$t" --title "$ttm" $ROWS_MENU $WINDOW_COLS 2
+				else
+					CONFIG_RESTORE_DEVICE="$ANSWER"
+					break
+				fi
+			else
+				CONFIG_RESTORE_DEVICE="$ANSWER"
+				break
+			fi
+		else
+			logExit
+			return 0
+		fi
+	done
+
+	logItem "RestoreDevice: $CONFIG_RESTORE_DEVICE"
+
+	[[ "$oldDevice" == "$CONFIG_RESTORE_DEVICE" ]]
+	local rc=$?
+	logExit "$rc"
+
+	echo "$rc $CONFIG_RESTORE_DEVICE $oldDevice"
+	read
+	return $rc
+}
+
 function config_email_do() {
 
 	getMenuText $MENU_CONFIG_EMAIL tt
@@ -3476,9 +3535,6 @@ function config_backuptype_do() {
 
 	getMenuText $MENU_CONFIG_TYPE tt
 
-	logItem "$b1"
-	logItem "$t"
-
 	local c1="$(getMessageText $BUTTON_CANCEL)"
 	local o1="$(getMessageText $BUTTON_OK)"
 	local d="$(getMessageText $DESCRIPTION_BACKUPTYPE)"
@@ -3492,11 +3548,23 @@ function config_backuptype_do() {
 	if [ $? -eq 0 ]; then
 		logItem "Answer: $ANSWER"
 		case "$ANSWER" in
-			$s4) CONFIG_BACKUPTYPE="clone" ;;
-			$s3) CONFIG_BACKUPTYPE="dd" ;;
-			$s2) CONFIG_BACKUPTYPE="tar" ;;
+			$s4) config_restore_device_do;
+				if (( $? == 0 )); then
+					CONFIG_BACKUPTYPE="clone"
+				else
+					CONFIG_RESTORE_DEVICE=""
+				fi
+				;;
+			$s3) CONFIG_BACKUPTYPE="dd"
+				 CONFIG_RESTORE_DEVICE=""
+				 ;;
+			$s2) CONFIG_BACKUPTYPE="tar"
+				 CONFIG_RESTORE_DEVICE=""
+				 ;;
 			$s1) CONFIG_BACKUPTYPE="rsync"
-				 CONFIG_ZIP_BACKUP=0 ;;
+				 CONFIG_ZIP_BACKUP=0
+				 CONFIG_RESTORE_DEVICE=""
+				 ;;
 			"") : ;;
 			*) whiptail --msgbox "Programm error, unrecognized backup type" $ROWS_MENU $WINDOW_COLS 2
 				logExit
