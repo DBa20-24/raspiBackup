@@ -3549,8 +3549,12 @@ function config_backuptype_do() {
 	if [ $? -eq 0 ]; then
 		logItem "Answer: $ANSWER"
 		case "$ANSWER" in
-			$s4) config_restore_device_do;
-				if (( $? != 0 )); then
+			$s4) if isTimerEnabled; then 
+					config_restore_device_do;
+					if (( $? != 0 )); then
+						CONFIG_BACKUPTYPE="clone"
+					fi
+				else
 					CONFIG_BACKUPTYPE="clone"
 				fi
 				;;
