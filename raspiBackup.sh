@@ -1959,8 +1959,8 @@ MSG_CLONE_ABORTED=303
 MSG_EN[$MSG_CLONE_ABORTED]="RBK0303I: Clone aborted."
 MSG_DE[$MSG_CLONE_ABORTED]="RBK0303I: Clone abgebrochen."
 MSG_SYNCING_CLONE=304
-MSG_EN[$MSG_SYNCING_CLONE]="RBK0304W: Syncronize clone on device %s."
-MSG_DE[$MSG_SYNCING_CLONE]="RBK0304W: Synchronisiere Clone auf dem Gerät %s."
+MSG_EN[$MSG_SYNCING_CLONE]="RBK0304W: Syncronize clone on device %s. Make sure it's the correct device. Otherwise you may delete important data."
+MSG_DE[$MSG_SYNCING_CLONE]="RBK0304W: Synchronisiere Clone auf dem Gerät %s. Stelle sicher dass es das richtige Gerät ist. Ansonsten können wichtige Daten gelöscht werden."
 MSG_UMOUNT_FAILED=305
 MSG_EN[$MSG_UMOUNT_FAILED]="RBK0305E: Umount of %s failed with RC %s."
 MSG_DE[$MSG_UMOUNT_FAILED]="RBK0305E: Umount von %s fehlerhaft mit RC %s."
@@ -10059,7 +10059,7 @@ if ! isClone; then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_RESTOREDEVICE_OPTION
 		exitError $RC_PARAMETER_ERROR
 	fi
-else
+else		
 	if [[ -z $RESTORE_DEVICE ]]; then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_CLONEDEVICE_OPTION
 		exitError $RC_PARAMETER_ERROR
