@@ -1533,7 +1533,7 @@ MENU_FI[$MENU_CONFIG_TYPE_RSYNC]='"rsync" "rsync-varmuuskopio ja hardlinkkien k�
 MENU_FR[$MENU_CONFIG_TYPE_RSYNC]='"rsync" "Sécuriser avec rsync en utilisant si possible des liens physiques"'
 MENU_ZH[$MENU_CONFIG_TYPE_RSYNC]='"rsync" "使用rsync备份,如果可能,使用硬链接"'
 
-# no NLS 
+# no NLS
 MENU_CONFIG_TYPE_CLONE=$((MCNT++))
 MENU_EN[$MENU_CONFIG_TYPE_CLONE]='"clone" "Clone to another device"'
 MENU_DE[$MENU_CONFIG_TYPE_CLONE]='"clone" "Klone auf ein anderes Gerät"'
@@ -2360,8 +2360,9 @@ function config_update_execute() {
 	sed -i -E "s/^(#?\s?)?DEFAULT_MSG_LEVEL=.*$/DEFAULT_MSG_LEVEL=\"$CONFIG_MSG_LEVEL\"/" "$CONFIG_ABS_FILE"
 	sed -i -E "s/^(#?\s?)?DEFAULT_EMAIL=.*$/DEFAULT_EMAIL=\"$CONFIG_EMAIL\"/" "$CONFIG_ABS_FILE"
 	sed -i -E "s/^(#?\s?)?DEFAULT_MAIL_PROGRAM=.*$/DEFAULT_MAIL_PROGRAM=\"$CONFIG_MAIL_PROGRAM\"/" "$CONFIG_ABS_FILE"
-	sed -i -E "s/^(#?\s?)?DEFAULT_RESTORE_DEVICE=.*$/DEFAULT_RESTORE_DEVICE=\"$CONFIG_RESTORE_DEVICE\"/" "$CONFIG_ABS_FILE"
-	local f=$(sed 's_/_\\/_g' <<< "$CONFIG_BACKUPPATH")
+	local f=$(sed 's_/_\\/_g' <<< "$CONFIG_RESTORE_DEVICE")
+	sed -i -E "s/^(#?\s?)?DEFAULT_RESTORE_DEVICE=.*$/DEFAULT_RESTORE_DEVICE=\"$f\"/" "$CONFIG_ABS_FILE"
+	f=$(sed 's_/_\\/_g' <<< "$CONFIG_BACKUPPATH")
 	sed -i -E "s/^(#?\s?)?DEFAULT_BACKUPPATH=.*$/DEFAULT_BACKUPPATH=\"$f\"/" "$CONFIG_ABS_FILE"
 
 	local pline sline
@@ -3403,8 +3404,6 @@ function config_restore_device_do() {
 	local rc=$?
 	logExit "$rc"
 
-	echo "$rc $CONFIG_RESTORE_DEVICE $oldDevice"
-	read
 	return $rc
 }
 
@@ -3510,6 +3509,7 @@ function config_backuptype_do() {
 	local rsync_=off
 	local clone_=off
 	local old="$CONFIG_BACKUPTYPE"
+	local old2="$CONFIG_RESTORE_DEVICE"
 
 	logEntry "$old"
 
@@ -3549,7 +3549,8 @@ function config_backuptype_do() {
 		logItem "Answer: $ANSWER"
 		case "$ANSWER" in
 			$s4) config_restore_device_do;
-				if (( $? == 0 )); then
+				set -x
+				if (( $? != 0 )); then
 					CONFIG_BACKUPTYPE="clone"
 				else
 					CONFIG_RESTORE_DEVICE=""
@@ -3571,10 +3572,13 @@ function config_backuptype_do() {
 				return 1 ;;
 		esac
 	fi
+	set +x
+	read
 
-	[[ "$old" == "$CONFIG_BACKUPTYPE" ]]
+	logItem "$old -$CONFIG_BACKUPTYPE - $old2 - $CONFIG_RESTORE_DEVICE"
+	[[ "$old" == "$CONFIG_BACKUPTYPE" && "$old2" == "$CONFIG_RESTORE_DEVICE" ]]
 	local rc=$?
-	logExit "$rc - $CONFIG_BACKUPTYPE"
+	logExit "$rc - $CONFIG_BACKUPTYPE $CONFIG_RESTORE_DEVICE"
 	return $rc
 }
 
