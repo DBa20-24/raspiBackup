@@ -1071,8 +1071,8 @@ MSG_FR[$MSG_INVALID_EMAIL]="Adresse e-mail invalide %1"
 MSG_ZH[$MSG_INVALID_EMAIL]="邮箱地址无效 %1"
 
 MSG_INVALID_RESTORE_DEVICE=$((SCNT++))
-MSG_EN[$MSG_INVALID_RESTORE_DEVICE]="Invalid clone device %1. Examples: /dev/sda, /dev/mmcblk0 or /dev/nvme0n1,"
-MSG_DE[$MSG_INVALID_RESTORE_DEVICE]="Ungültiges Klonegerät %1. Beispiele: /dev/sda, /dev/mmcblk0 oder /dev/nvme0n1"
+MSG_EN[$MSG_INVALID_RESTORE_DEVICE]="Invalid clone device %1 entered. Examples: /dev/sda, /dev/mmcblk0 or /dev/nvme0n1,"
+MSG_DE[$MSG_INVALID_RESTORE_DEVICE]="Ungültiges Klonegerät %1 angegeben. Beispiele: /dev/sda, /dev/mmcblk0 oder /dev/nvme0n1"
 
 MSG_LOCAL_BACKUPPATH=$((SCNT++))
 MSG_EN[$MSG_LOCAL_BACKUPPATH]="Backup would be stored on SD card"
@@ -3404,6 +3404,7 @@ function config_restore_device_do() {
 	local rc=$?
 	logExit "$rc"
 
+#	returns 0 if no update happens and 1 else 
 	return $rc
 }
 
@@ -3549,11 +3550,8 @@ function config_backuptype_do() {
 		logItem "Answer: $ANSWER"
 		case "$ANSWER" in
 			$s4) config_restore_device_do;
-				set -x
 				if (( $? != 0 )); then
 					CONFIG_BACKUPTYPE="clone"
-				else
-					CONFIG_RESTORE_DEVICE=""
 				fi
 				;;
 			$s3) CONFIG_BACKUPTYPE="dd"
@@ -3572,8 +3570,6 @@ function config_backuptype_do() {
 				return 1 ;;
 		esac
 	fi
-	set +x
-	read
 
 	logItem "$old -$CONFIG_BACKUPTYPE - $old2 - $CONFIG_RESTORE_DEVICE"
 	[[ "$old" == "$CONFIG_BACKUPTYPE" && "$old2" == "$CONFIG_RESTORE_DEVICE" ]]
