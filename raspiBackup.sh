@@ -1941,6 +1941,9 @@ MSG_DE[$OVERLAY_FILESYSTEM_NOT_SUPPORTED]="RBK0296E: Overlayfilesystem wird nich
 MSG_PARTITIONS_EXTEND_DISK_SIZE=297
 MSG_EN[$MSG_PARTITIONS_EXTEND_DISK_SIZE]="RBK0297E: Partitioning exceeds disk size."
 MSG_DE[$MSG_PARTITIONS_EXTEND_DISK_SIZE]="RBK0297E: Partitionierung größer als Diskgröße."
+MSG_UNSUPPORTED_PARTITIONING=298
+MSG_EN[$MSG_UNSUPPORTED_PARTITIONING]="RBK0298E: Filesystem %1 on boot and/or %2 on root not supported."
+MSG_DE[$MSG_UNSUPPORTED_PARTITIONING]="RBK0298E: Filesystem %1 auf boot und/oder %2 auf root ist nicht unterstützt."
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -3811,6 +3814,23 @@ function checkSfdiskOK() { # device, e.g. /dev/mmcblk0
 	logItem "freeSize: $freeSize"
 
 	rc=$(( ( $deviceSize / 512 ) > $usedSize ))
+
+	logExit $rc
+	return $rc
+}
+
+function checkPartitioning() {
+
+	logEntry
+
+	local bootFS="$(findmnt --fstab --evaluate | egrep "^/boot" | awk '{print $3}')"
+	local rootFS="$(findmnt --fstab --evaluate | egrep "^/ " | awk '{print $3}')"
+
+	logItem "$bootFS - $rootFS"
+	[[ "$bootFS" == "vfat" && "$rootFS" == "ext4" ]]
+	local rc=$?
+
+	echo "$bootFS $rootFS"
 
 	logExit $rc
 	return $rc
@@ -6956,7 +6976,6 @@ function doitBackup() {
 
 	checkImportantParameters
 
-	getRootPartition
 	inspect4Backup
 
 	if ! checkSfdiskOK $BOOT_DEVICENAME; then
@@ -6965,6 +6984,13 @@ function doitBackup() {
 	fi
 
 	commonChecks
+
+	local fs
+	fs=( $(checkPartitioning) )
+	if (( $? )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNSUPPORTED_PARTITIONING "${fs[0]}" "${fs[1]}"
+		exitError $RC_MISC_ERROR
+	fi
 
 	if hasSpaces "$BACKUPPATH"; then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_FILE_CONTAINS_SPACES "$BACKUPPATH"
