@@ -5816,7 +5816,7 @@ function logSystemDiskState() {
 	logCommand "blkid"
 	logCommand "fdisk -l"
 	logCommand "mount"
-	logCommand "df -h"
+	logCommand "df -h -l"
 	logExit
 }
 
