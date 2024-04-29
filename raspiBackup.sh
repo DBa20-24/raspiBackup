@@ -4077,22 +4077,77 @@ function calcSumSizeFromSFDISK() { # sfdisk file name
 
 	local file="$1"
 
-	logCommand "cat $file"
-
 # /dev/mmcblk0p1 : start=     8192, size=    83968, Id= c
 # or
 # /dev/sdb1 : start=          63, size=  1953520002, type=83
 
 	local partitionregex="/dev/.*[p]?([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9a-z]*([0-9a-z]+)"
-	local lineNo=0
 	local sumSize=0
+	local sectorSize
+
+	logCommand "cat $file"
+
+	sectorSize=$(grep "^sector-size:" $file)
+	if (( $? )); then
+		sectorSize=512	# not set in buster and earlier, use default
+	else
+		sectorSize=$(cut -f 2 -d ' ' <<< "$sectorSize")
+		if [[ -z $sectorSize ]]; then
+			assertionFailed $LINENO "Unable to retrieve sectorsize"
+		fi
+	fi
 
 	local line
-	while IFS="" read line; do
-		(( lineNo++ ))
-		if [[ -z $line ]]; then
-			continue
+	line="$(tail -1 $file)"
+	if [[ $line =~ $partitionregex ]]; then
+		local p=${BASH_REMATCH[1]}
+		local start=${BASH_REMATCH[2]}
+		local size=${BASH_REMATCH[3]}
+		local id=${BASH_REMATCH[4]}
+
+		if (( $id != 83 )); then
+			assertionFailed $LINENO "Last partition is no Linux partition"
 		fi
+
+		(( sumSize = ( start + size) * sectorSize ))
+		echo "$sumSize"
+	else
+		assertionFailed $LINENO "No matching last partition found"
+	fi
+
+	logExit "$sumSize"
+}
+
+function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_target_filename
+
+	logEntry "$@"
+
+	local sourceFile="$1"
+	local targetSize="$2"
+	local targetFile="$3"
+
+	local newSize sectorSize
+
+	local partitionregex="/dev/.*[p]?([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9a-z]*([0-9a-z]+)"
+
+	sectorSize=$(grep "^sector-size:" $sourceFile)
+	if (( $? )); then
+		sectorSize=512	# not set in buster and earlier, use default
+	else
+		sectorSize=$(cut -f 2 -d ' ' <<< "$sectorSize")
+		if [[ -z $sectorSize ]]; then
+			assertionFailed $LINENO "Unablt to retrieve sector size"
+		fi
+	fi
+
+	local sourceSize=$(calcSumSizeFromSFDISK "$sourceFile")
+		
+	cp "$sourceFile" "$targetFile"
+
+	if (( sourceSize != targetSize )); then
+
+		local line
+		line="$(tail -1 $targetFile)"
 
 		if [[ $line =~ $partitionregex ]]; then
 			local p=${BASH_REMATCH[1]}
@@ -4100,24 +4155,26 @@ function calcSumSizeFromSFDISK() { # sfdisk file name
 			local size=${BASH_REMATCH[3]}
 			local id=${BASH_REMATCH[4]}
 
-			if [[ $id == 85 || $id == 5 ]]; then
-				continue
+			if (( $id != 83 )); then
+				assertionFailed $LINENO "Last partition is no Linux partition"
 			fi
 
-			if [[ $sumSize == 0 ]]; then
-				sumSize=$((start+size))
+			if (( sourceSize > targetSize )); then
+				(( newSize = ( size - ( sourceSize - targetSize ) / sectorSize ) ))
 			else
-				(( sumSize+=size ))
+				(( newSize = ( size + ( targetSize - sourceSize ) / sectorSize ) ))
 			fi
+			
+			sed -i "s/${size}/${newSize}/" $targetFile
+
+		else
+			assertionFailed $LINENO "Last partition is no Linux partition"
 		fi
+	fi
 
-	done < $file
+	logCommand "cat $targetFile"
 
-	(( sumSize *= 512 ))
-
-	echo "$sumSize"
-
-	logExit "$sumSize"
+	logExit 
 }
 
 # colorAnnotation
