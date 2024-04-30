@@ -1948,6 +1948,9 @@ MSG_DE[$MSG_UNSUPPORTED_PARTITIONING]="RBK0298E: Filesystem %1 auf boot und/oder
 MSG_MOVE_TEMP_DIR=299
 MSG_EN[$MSG_MOVE_TEMP_DIR]="RBK0299I: Backup directory %1 created."
 MSG_DE[$MSG_MOVE_TEMP_DIR]="RBK0299I: Backupverzeichnis %1 erstellt."
+MSG_ADJUSTING_LAST=300
+MSG_EN[$MSG_ADJUSTING_LAST]="RBK0300I: Adjusting last partition from %s to %s."
+MSG_DE[$MSG_ADJUSTING_LAST]="RBK0300I: Letzte Partition wird von %s auf %s angepasst."
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -4118,7 +4121,7 @@ function calcSumSizeFromSFDISK() { # sfdisk file name
 	logExit "$sumSize"
 }
 
-function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_target_filename
+function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_target_filename -> oldPartitionSize newPartitionSize
 
 	logEntry "$@"
 
@@ -4127,6 +4130,7 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 	local targetFile="$3"
 
 	local newSize sectorSize
+	local oldPartitionSize newPartitionSize
 
 	local partitionregex="/dev/.*[p]?([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9a-z]*([0-9a-z]+)"
 
@@ -4139,6 +4143,8 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 			assertionFailed $LINENO "Unablt to retrieve sector size"
 		fi
 	fi
+
+	logCommand "cat $sourceFile"
 
 	local sourceSize=$(calcSumSizeFromSFDISK "$sourceFile")
 		
@@ -4159,11 +4165,15 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 				assertionFailed $LINENO "Last partition is no Linux partition"
 			fi
 
+			(( oldPartitionSize = ( size - start ) * sectorSize ))
+
 			if (( sourceSize > targetSize )); then
 				(( newSize = ( size - ( sourceSize - targetSize ) / sectorSize ) ))
 			else
 				(( newSize = ( size + ( targetSize - sourceSize ) / sectorSize ) ))
 			fi
+
+			(( newPartitionSize = ( newSize - start ) * sectorSize ))
 			
 			sed -i "s/${size}/${newSize}/" $targetFile
 
@@ -4172,9 +4182,16 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 		fi
 	fi
 
+	logItem "Old: $oldPartitionSize - New: $newPartitionSize"
+
 	logCommand "cat $targetFile"
 
-	logExit 
+	local ret="$oldPartitionSize $newPartitionSize"
+
+	echo "$ret"
+
+	logExit "$ret"	
+
 }
 
 # colorAnnotation
@@ -5991,11 +6008,8 @@ function restore() {
 			else
 				writeToConsole $MSG_LEVEL_DETAILED $MSG_CREATING_PARTITIONS "$RESTORE_DEVICE"
 
-				cp "$SF_FILE" $MODIFIED_SFDISK
-				logItem "Current sfdisk file"
-				logCommand "cat $MODIFIED_SFDISK"
+				if (( ! $ROOT_PARTITION_DEFINED )) && (( $RESIZE_ROOTFS )); then
 
-				if (( ! $ROOT_PARTITION_DEFINED )) && (( $RESIZE_ROOTFS )) && (( ! $PARTITIONBASED_BACKUP )); then
 					local sourceSDSize=$(calcSumSizeFromSFDISK "$SF_FILE")
 					local targetSDSize=$(blockdev --getsize64 $RESTORE_DEVICE)
 					logItem "sourceSDSize: $sourceSDSize - targetSDSize: $targetSDSize"
@@ -6011,32 +6025,22 @@ function restore() {
 #						/dev/mmcblk0p1 : start=        8192, size=      524288, type=c
 #						/dev/mmcblk0p2 : start=      532480, size=    15196160, type=83
 
-						local sourceValues=( $(awk '/(1|2) :/ { v=$4 $6; gsub(","," ",v); printf "%s",v }' "$SF_FILE") )
-						if [[ ${#sourceValues[@]} != 4 ]]; then
+						local sourceValues=( $(awk '/[0-9] :/ { v=$4 $6; gsub(","," ",v); printf "%s",v }' "$SF_FILE") )
+						if (( ${#sourceValues[@]} < 4 )); then
 							logCommand "cat $SF_FILE"
 							assertionFailed $LINENO "Expected at least 2 partitions in $SF_FILE"
 						fi
 
-						# Backup partition has only one partition -> external root partition -> -R has to be specified
-						if (( ${sourceValues[2]} == 0 )) || (( ${sourceValues[3]} == 0 )); then
-							writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_R_OPTION
-							exitError $RC_MISC_ERROR
-						fi
+						local partitionSizes
+						partitionSizes=($(createResizedSFDisk "$SF_FILE" "$targetSDSize" "$MODIFIED_SFDISK"))
 
-						local adjustedTargetPartitionBlockSize=$(( $targetSDSize / 512 - ${sourceValues[1]} - ${sourceValues[0]} - ( ${sourceValues[2]} - ${sourceValues[1]} ) ))
-						logItem "sourceSDSize: $sourceSDSize - targetSDSize: $targetSDSize"
-						logItem "sourceBlockSize: ${sourceValues[3]} - adjusted targetBlockSize: $adjustedTargetPartitionBlockSize"
+						local oldPartitionSourceSize=${partitionSizes[0]}
+						local newPartitionTargetSize=${partitionSizes[1]}
 
-						local newTargetPartitionSize=$(( adjustedTargetPartitionBlockSize * 512 ))
-						local oldPartitionSourceSize=$(( ${sourceValues[3]} * 512 ))
-
-						sed -i "/2 :/ s/${sourceValues[3]}/$adjustedTargetPartitionBlockSize/" $MODIFIED_SFDISK
-
-						logItem "Updated sfdisk file"
-						logCommand "cat $MODIFIED_SFDISK"
-
-						if [[ "$(bytesToHuman $oldPartitionSourceSize)" != "$(bytesToHuman $newTargetPartitionSize)" ]]; then
-							writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_SECOND "$(bytesToHuman $oldPartitionSourceSize)" "$(bytesToHuman $newTargetPartitionSize)"
+						if (( ${#sourceValues[@]} == 4 )); then
+							writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_SECOND "$(bytesToHuman $oldPartitionSourceSize)" "$(bytesToHuman $newPartitionTargetSize)"
+						else
+							writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_LAST "$(bytesToHuman $oldPartitionSourceSize)" "$(bytesToHuman $newPartitionTargetSize)"
 						fi
 
 					fi

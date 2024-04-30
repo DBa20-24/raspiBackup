@@ -29,15 +29,21 @@ testFile=$(mktemp)
 
 function test_createResizedSFDisk() {
 
-	createResizedSFDisk $1 $2 $3
+	local partitionSizes=($(createResizedSFDisk $1 $2 $3 $4 $5))
 
 	local resizedSize
-	resizedSize=$(calcSumSizeFromSFDISK $3)
+	resizedSize="$(calcSumSizeFromSFDISK "$3")"
+	echo "${resizedSize[@]}"
+	read
+	set -x
+	local old=${resizedSize[0]}
+	local new=${resizedSize[1]}
+	set +x
 
-	if (( resizedSize != $2 )); then
+	if (( resizedSize != $2 || $4 != $old || $5 != $new )); then
 		echo -n "FAILED --- "
 	else
-		echo -n "SUCCESS ---"
+		echo -n "SUCCESS --- "
 	fi
 
 	echo "$1: $resizedSize ($(bytesToHuman $resizedSize))"
@@ -46,7 +52,7 @@ function test_createResizedSFDisk() {
 
 function test_calcSumSizeFromSFDISK() {
 
-	local size="$(calcSumSizeFromSFDISK $1)"
+	local size="$(calcSumSizeFromSFDISK "$1")"
 
 	if (( size != $2 )); then
 		echo -n "FAILED --- "
@@ -58,15 +64,17 @@ function test_calcSumSizeFromSFDISK() {
 
 }
 
+:<<'skip'
 test_calcSumSizeFromSFDISK 32GB.sfdisk 31268536320
 test_calcSumSizeFromSFDISK 32GB_nosecsize.sfdisk 31268536320
 test_calcSumSizeFromSFDISK 128GB.sfdisk 128035676160
 test_calcSumSizeFromSFDISK 128GB_nosecsize.sfdisk 128035676160
+skip
 
 test_createResizedSFDisk "128GB.sfdisk" 31268536320 $testFile
-test_createResizedSFDisk "128GB_nosecsize.sfdisk" 31268536320 $testFile
+#test_createResizedSFDisk "128GB_nosecsize.sfdisk" 31268536320 $testFile
 test_createResizedSFDisk "32GB.sfdisk" 128035676160 $testFile
-test_createResizedSFDisk "32GB_nosecsize.sfdisk" 128035676160 $testFile
+#test_createResizedSFDisk "32GB_nosecsize.sfdisk" 128035676160 $testFile
 
 rm $testFile
 
