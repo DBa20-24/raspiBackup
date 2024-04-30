@@ -2654,7 +2654,7 @@ function compareVersions() { # v1 v2
 	done
 	echo $rc
 	logExit $rc
-	return 
+	return
 }
 
 function repeat() { # char num
@@ -4147,7 +4147,7 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 	logCommand "cat $sourceFile"
 
 	local sourceSize=$(calcSumSizeFromSFDISK "$sourceFile")
-		
+
 	cp "$sourceFile" "$targetFile"
 
 	if (( sourceSize != targetSize )); then
@@ -4174,7 +4174,7 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 			fi
 
 			(( newPartitionSize = ( newSize - start ) * sectorSize ))
-			
+
 			sed -i "s/${size}/${newSize}/" $targetFile
 
 		else
@@ -4190,7 +4190,7 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 
 	echo "$ret"
 
-	logExit "$ret"	
+	logExit "$ret"
 
 }
 
@@ -4949,7 +4949,7 @@ function cleanup() { # trap
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_TEMPMOVE_FAILED $rc
 				CLEANUP_RC=$RC_TEMPMOVE_FAILED
 			else
-				BACKUPTARGET_DIR="$BACKUPTARGET_FINAL_DIR"		
+				BACKUPTARGET_DIR="$BACKUPTARGET_FINAL_DIR"
 				if (( \
 					( $SMART_RECYCLE && ! $SMART_RECYCLE_DRYRUN ) \
 					|| ! $SMART_RECYCLE \
