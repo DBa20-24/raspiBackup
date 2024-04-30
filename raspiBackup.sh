@@ -6032,7 +6032,7 @@ function restore() {
 						fi
 
 						local partitionSizes
-						partitionSizes=($(createResizedSFDisk "$SF_FILE" "$targetSDSize" "$MODIFIED_SFDISK"))
+						partitionSizes=( $(createResizedSFDisk "$SF_FILE" "$targetSDSize" "$MODIFIED_SFDISK") )
 
 						local oldPartitionSourceSize=${partitionSizes[0]}
 						local newPartitionTargetSize=${partitionSizes[1]}
@@ -6044,6 +6044,8 @@ function restore() {
 						fi
 
 					fi
+				else
+					cp "$SF_FILE" "$MODIFIED_SFDISK" # just use unmodified sfdisk when option -R is used for a hybrid system
 				fi
 
 				sfdisk -f $RESTORE_DEVICE < "$MODIFIED_SFDISK" &>>"$LOG_FILE"
