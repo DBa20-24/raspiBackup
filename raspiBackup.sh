@@ -2726,6 +2726,7 @@ function logOptions() { # option state
 	logItem "NOTIFY_UPDATE=$NOTIFY_UPDATE"
 	logItem "PARTITIONBASED_BACKUP=$PARTITIONBASED_BACKUP"
 	logItem "PARTITIONS_TO_BACKUP=$PARTITIONS_TO_BACKUP"
+	logItem "PARTITIONS_TO_RESTORE=$PARTITIONS_TO_RESTORE"
 	logItem "PUSHOVER_TOKEN=$PUSHOVER_TOKEN"
 	logItem "PUSHOVER_USER=$PUSHOVER_USER"
 	logItem "PUSHOVER_NOTIFICATIONS=$PUSHOVER_NOTIFICATIONS"
@@ -2846,8 +2847,9 @@ function initializeDefaultConfigVariables() {
 	DEFAULT_RESTORE_EXTENSIONS=""
 	# partition based backup  (0 = false, 1 = true)
 	DEFAULT_PARTITIONBASED_BACKUP=0
-	# backup first two partitions only
+	# backup and restore first two partitions only
 	DEFAULT_PARTITIONS_TO_BACKUP="1 2"
+	DEFAULT_PARTITIONS_TO_RESTORE="1 2"
 	# language (DE or EN)
 	DEFAULT_LANGUAGE=""
 	# hosts which will get the updated backup script with parm -y - non pwd access with keys has to be enabled
@@ -2971,6 +2973,7 @@ function copyDefaultConfigVariables() {
 	NOTIFY_UPDATE="$DEFAULT_NOTIFY_UPDATE"
 	PARTITIONBASED_BACKUP="$DEFAULT_PARTITIONBASED_BACKUP"
 	PARTITIONS_TO_BACKUP="$DEFAULT_PARTITIONS_TO_BACKUP"
+	PARTITIONS_TO_RESTORE="$DEFAULT_PARTITIONS_TO_RESTORE"
 	PUSHOVER_TOKEN="$DEFAULT_PUSHOVER_TOKEN"
 	PUSHOVER_USER="$DEFAULT_PUSHOVER_USER"
 	PUSHOVER_NOTIFICATIONS="$DEFAULT_PUSHOVER_NOTIFICATIONS"
@@ -7615,21 +7618,6 @@ function restorePartitionBasedBackup() {
 		logItem "$(mount | grep $RESTORE_DEVICE)"
 	fi
 
-	if (( ! $SKIP_SFDISK && ! $FORCE_SFDISK )); then
-		local sourceSDSize=$(calcSumSizeFromSFDISK "$SF_FILE")
-		local targetSDSize=$(blockdev --getsize64 $RESTORE_DEVICE)
-		logItem "SourceSDSize: $sourceSDSize - targetSDSize: $targetSDSize"
-
-		if (( targetSDSize < sourceSDSize )); then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_TARGETSD_SIZE_TOO_SMALL "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
-			exitError $RC_MISC_ERROR
-		elif (( targetSDSize > sourceSDSize )); then
-			local unusedSpace=$(( targetSDSize - sourceSDSize ))
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_TARGETSD_SIZE_BIGGER "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)" "$(bytesToHuman $unusedSpace)"
-		fi
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_REPARTITION_WARNING $RESTORE_DEVICE
-	fi
-
 	current_partition_table="$(getPartitionTable $RESTORE_DEVICE)"
 	writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$RESTORE_DEVICE" "$current_partition_table"
 	writeToConsole $MSG_LEVEL_MINIMAL $MSG_WARN_RESTORE_PARTITION_DEVICE_OVERWRITTEN "$RESTORE_DEVICE"
@@ -7643,31 +7631,29 @@ function restorePartitionBasedBackup() {
 		echo "Y${NL}"
 	fi
 
-	if (( ! $SKIP_SFDISK )); then
-		writeToConsole $MSG_LEVEL_DETAILED $MSG_PARTITIONING_SDCARD "$RESTORE_DEVICE"
-		writeToConsole $MSG_LEVEL_DETAILED $MSG_CREATING_PARTITIONS "$RESTORE_DEVICE"
-		logItem "mount: $(mount)"
-
-		local force=""
-		(( $FORCE_SFDISK )) && force="--force"
-
-		local tmp=$(mktemp)
-		logItem "sfdisk"
-		sfdisk $force -uSL $RESTORE_DEVICE < "$SF_FILE" > "$tmp" 2>&1
+	if (( $FORCE_SFDISK )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_FORCING_CREATING_PARTITIONS
+		sfdisk -f "$RESTORE_DEVICE" < "$SF_FILE" &>>"$LOG_FILE"
 		rc=$?
-		local error=$(<$tmp)
-		echo "$error" >> "$LOG_FILE"
-		logItem "Error: $error"
-		rm "$tmp" &>/dev/null
-		if [ $rc != 0 ]; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_PARTITIONS $rc "$error"
+		if (( $rc )); then
+			if (( $rc == 1 )); then
+				local tmpSF="$(basename $SF_FILE)"
+				cp "$SF_FILE" "/tmp/$tmpSF"
+				sed -i 's/sector-size/d' "/tmp/$tmpSF"
+				sfdisk -f "$RESTORE_DEVICE" < "/tmp/$tmpSF" &>>"$LOG_FILE"
+				rc=$?
+				rm "/tmp/$tmpSF"
+			fi
+		fi
+		if (( $rc )); then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_PARTITIONS $rc "sfdisk error"
 			exitError $RC_CREATE_PARTITIONS_FAILED
 		fi
 
 		waitForPartitionDefsChanged
 
-	else
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_SKIPPING_CREATING_PARTITIONS
+	elif (( $SKIP_SFDISK )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_SKIP_CREATING_PARTITIONS
 	fi
 
 	if [[ "${RESTOREFILE: -1}" != "/" ]]; then
@@ -8230,7 +8216,7 @@ function doitRestore() {
 
 	# adjust partition for tar and rsync backup in normal mode
 
-	if (( ! $PARTITIONBASED_BACKUP )) && [[ $BACKUPTYPE != $BACKUPTYPE_DD && $BACKUPTYPE != $BACKUPTYPE_DDZ ]] && (( ! $ROOT_PARTITION_DEFINED )); then
+	if (( [[ $BACKUPTYPE != $BACKUPTYPE_DD && $BACKUPTYPE != $BACKUPTYPE_DDZ ]] && (( ! $ROOT_PARTITION_DEFINED )); then
 
 		local sourceSDSize=$(calcSumSizeFromSFDISK "$SF_FILE")
 		local targetSDSize=$(blockdev --getsize64 $RESTORE_DEVICE)
@@ -9576,6 +9562,7 @@ while (( "$#" )); do
 	  checkOptionParameter "$1" "$2"
 	  (( $? )) && exitError $RC_PARAMETER_ERROR
 	  PARTITIONS_TO_BACKUP="$2"; shift 2
+	  PARTITIONS_TO_RESTORE=$PARTITIONS_TO_BACKUP
 	  ;;
 
 	--telegramToken)
