@@ -7631,9 +7631,17 @@ function restorePartitionBasedBackup() {
 		echo "Y${NL}"
 	fi
 
-	if (( $FORCE_SFDISK )); then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_FORCING_CREATING_PARTITIONS
-		sfdisk -f "$RESTORE_DEVICE" < "$SF_FILE" &>>"$LOG_FILE"
+	if (( ! $SKIP_SFDISK )); then
+		writeToConsole $MSG_LEVEL_DETAILED $MSG_PARTITIONING_SDCARD "$RESTORE_DEVICE"
+		writeToConsole $MSG_LEVEL_DETAILED $MSG_CREATING_PARTITIONS "$RESTORE_DEVICE"
+
+		local force=""
+		if (( $FORCE_SFDISK )); then
+			force="--force"
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_FORCING_CREATING_PARTITIONS
+		fi
+
+		sfdisk $force -f "$RESTORE_DEVICE" < "$SF_FILE" &>>"$LOG_FILE"
 		rc=$?
 		if (( $rc )); then
 			if (( $rc == 1 )); then
@@ -7652,7 +7660,7 @@ function restorePartitionBasedBackup() {
 
 		waitForPartitionDefsChanged
 
-	elif (( $SKIP_SFDISK )); then
+	else 
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_SKIP_CREATING_PARTITIONS
 	fi
 
