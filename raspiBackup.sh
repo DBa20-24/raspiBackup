@@ -4143,7 +4143,7 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 	else
 		sectorSize=$(cut -f 2 -d ' ' <<< "$sectorSize")
 		if [[ -z $sectorSize ]]; then
-			assertionFailed $LINENO "Unablt to retrieve sector size"
+			assertionFailed $LINENO "Unable to retrieve sector size"
 		fi
 	fi
 
@@ -5919,7 +5919,8 @@ function formatBackupDevice() {
 
 	if (( $SKIP_SFDISK )); then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_SKIP_CREATING_PARTITIONS
-	else
+		
+	elif [[ $BACKUPTYPE != $BACKUPTYPE_DD && $BACKUPTYPE != $BACKUPTYPE_DDZ ]]; then
 	
 		writeToConsole $MSG_LEVEL_DETAILED $MSG_PARTITIONING_SDCARD "$RESTORE_DEVICE"
 		writeToConsole $MSG_LEVEL_DETAILED $MSG_CREATING_PARTITIONS "$RESTORE_DEVICE"
@@ -5955,26 +5956,32 @@ function formatBackupDevice() {
 				local targetSDSize=$(blockdev --getsize64 $RESTORE_DEVICE)
 				logItem "sourceSDSize: $sourceSDSize - targetSDSize: $targetSDSize"
 
-				if (( targetSDSize < sourceSDSize )); then
-					writeToConsole $MSG_LEVEL_MINIMAL $MSG_TARGETSD_SIZE_TOO_SMALL "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
-					exitError $RC_MISC_ERROR
-				elif (( targetSDSize > sourceSDSize )); then
-					if (( ! RESIZE_ROOTFS )); then
-						local unusedSpace=$(( targetSDSize - sourceSDSize ))
-						writeToConsole $MSG_LEVEL_MINIMAL $MSG_TARGETSD_SIZE_BIGGER "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)" "$(bytesToHuman $unusedSpace)"
-					fi
-				fi
-
 				if (( sourceSDSize != targetSDSize )); then
 
-	#						label: dos
-	#						label-id: 0x3c3f4bdb
-	#						device: /dev/mmcblk0
-	#						unit: sectors
-	#						sector-size: 512
-	#
-	#						/dev/mmcblk0p1 : start=        8192, size=      524288, type=c
-	#						/dev/mmcblk0p2 : start=      532480, size=    15196160, type=83
+					if (( sourceSDSize > targetSDSize )); then
+						if (( $RESIZE_ROOTFS )); then
+							writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_WARNING "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
+						else
+							writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_DISABLED "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
+							exitError $RC_PARAMETER_ERROR
+						fi
+					else
+						if (( $RESIZE_ROOTFS )); then
+							if (( $targetSDSize >= $TWO_TB )); then		# target should have gpt in order to use space > 2TB during expansion
+								writeToConsole $MSG_LEVEL_MINIMAL $MSG_TARGET_REQUIRES_GPT "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)"
+							fi
+							writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_WARNING2 "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
+						fi
+					fi
+
+#						label: dos
+#						label-id: 0x3c3f4bdb
+#						device: /dev/mmcblk0
+#						unit: sectors
+#						sector-size: 512
+#
+#						/dev/mmcblk0p1 : start=        8192, size=      524288, type=c
+#						/dev/mmcblk0p2 : start=      532480, size=    15196160, type=83
 
 					local sourceValues=( $(awk '/[0-9] :/ { v=$4 $6; gsub(","," ",v); printf "%s",v }' "$SF_FILE") )
 					if (( ${#sourceValues[@]} < 4 )); then
@@ -8219,35 +8226,6 @@ function doitRestore() {
 	#		exitError $RC_RESTORE_FAILED
 	#	fi
 	#fi
-
-	# adjust partition for tar and rsync backup mode
-
-	if [[ $BACKUPTYPE != $BACKUPTYPE_DD && $BACKUPTYPE != $BACKUPTYPE_DDZ ]] && (( ! $ROOT_PARTITION_DEFINED )); then
-
-		local sourceSDSize=$(calcSumSizeFromSFDISK "$SF_FILE")
-		local targetSDSize=$(blockdev --getsize64 $RESTORE_DEVICE)
-		logItem "soureSDSize: $sourceSDSize - targetSDSize: $targetSDSize"
-
-		if (( ! $FORCE_SFDISK && ! $SKIP_SFDISK )); then
-			if (( sourceSDSize != targetSDSize )); then
-				if (( sourceSDSize > targetSDSize )); then
-					if (( $RESIZE_ROOTFS )); then
-						writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_WARNING "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
-					else
-						writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_DISABLED "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
-						exitError $RC_PARAMETER_ERROR
-					fi
-				else
-					if (( $RESIZE_ROOTFS )); then
-						if (( $targetSDSize >= $TWO_TB )); then		# target should have gpt in order to use space > 2TB during expansion
-							writeToConsole $MSG_LEVEL_MINIMAL $MSG_TARGET_REQUIRES_GPT "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)"
-						fi
-						writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_WARNING2 "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
-					fi
-				fi
-			fi
-		fi
-	fi
 
 	rc=0
 
