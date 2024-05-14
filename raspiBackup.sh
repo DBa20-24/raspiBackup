@@ -7410,6 +7410,14 @@ function doitBackup() {
 
 }
 
+function listDeviceInfo() { # device (/dev/sda)
+
+	logEntry "$1"
+	local result="$(IFS='' lsblk $1 -o NAME,FSSIZE,FSTYPE,FSUSED,FSUSE%,SIZE,LABEL)"
+	echo "$result"
+	logExit
+}
+
 function getPartitionTable() { # device
 
 	logEntry "$1"
@@ -7566,20 +7574,16 @@ function restoreNonPartitionBasedBackup() {
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_SKIP_CREATING_PARTITIONS
 	fi
 
-	current_partition_table="$(getPartitionTable $RESTORE_DEVICE)"
-	if [[ -n "$current_partition_table" ]]; then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$RESTORE_DEVICE"
-		echo "$current_partition_table"
-	else
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_PARTITION_TABLE_DEFINED "$RESTORE_DEVICE"
-		if (( $SKIP_SFDISK )); then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_PARTITION "$RESTORE_DEVICE"
-			exitError $RC_MISSING_PARTITION
-		fi
-	fi
-
 	if (( ! $ROOT_PARTITION_DEFINED )); then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_WARN_RESTORE_DEVICE_OVERWRITTEN $RESTORE_DEVICE
+		current_partition_table="$(listDeviceInfo $RESTORE_DEVICE)"
+		if [[ -n $current_partition_table ]]; then
+			set -x
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$RESTORE_DEVICE" "$current_partition_table"
+			set +x
+		else
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_PARTITION_TABLE_DEFINED "$RESTORE_DEVICE"
+		fi
 	else
 		if [[ $ROOT_DEVICE =~ /dev/mmcblk0 || $ROOT_DEVICE =~ "/dev/loop" || $ROOT_DEVICE =~ /dev/nvme0n1 ]]; then
 			ROOT_DEVICE=$(sed -E 's/p[0-9]+$//' <<< $ROOT_PARTITION)
@@ -7588,7 +7592,7 @@ function restoreNonPartitionBasedBackup() {
 		fi
 
 		if [[ $ROOT_DEVICE != $RESTORE_DEVICE ]]; then
-			current_partition_table="$(getPartitionTable $ROOT_DEVICE)"
+			current_partition_table="$(listDeviceInfo $ROOT_DEVICE)"
 			if [[ -n $current_partition_table ]]; then
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$ROOT_DEVICE" "$current_partition_table"
 			else
@@ -7656,7 +7660,7 @@ function restorePartitionBasedBackup() {
 		logItem "$(mount | grep $RESTORE_DEVICE)"
 	fi
 
-	current_partition_table="$(getPartitionTable $RESTORE_DEVICE)"
+	current_partition_table="$(listDeviceInfo $RESTORE_DEVICE)"
 	writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$RESTORE_DEVICE" "$current_partition_table"
 	writeToConsole $MSG_LEVEL_MINIMAL $MSG_WARN_RESTORE_PARTITION_DEVICE_OVERWRITTEN "$RESTORE_DEVICE"
 
