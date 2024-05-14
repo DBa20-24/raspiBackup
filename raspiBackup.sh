@@ -7413,7 +7413,7 @@ function doitBackup() {
 function listDeviceInfo() { # device (/dev/sda)
 
 	logEntry "$1"
-	local result="$(IFS='' lsblk $1 -o NAME,FSSIZE,FSTYPE,FSUSED,FSUSE%,SIZE,LABEL)"
+	local result="$(IFS='' lsblk $1 -o NAME,SIZE,FSTYPE,FSSIZE,FSUSED,FSUSE%,PARTLABEL)"
 	echo "$result"
 	logExit
 }
@@ -7578,9 +7578,8 @@ function restoreNonPartitionBasedBackup() {
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_WARN_RESTORE_DEVICE_OVERWRITTEN $RESTORE_DEVICE
 		current_partition_table="$(listDeviceInfo $RESTORE_DEVICE)"
 		if [[ -n $current_partition_table ]]; then
-			set -x
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$RESTORE_DEVICE" "$current_partition_table"
-			set +x
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$RESTORE_DEVICE"
+			echo "$current_partition_table"
 		else
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_PARTITION_TABLE_DEFINED "$RESTORE_DEVICE"
 		fi
@@ -7594,7 +7593,8 @@ function restoreNonPartitionBasedBackup() {
 		if [[ $ROOT_DEVICE != $RESTORE_DEVICE ]]; then
 			current_partition_table="$(listDeviceInfo $ROOT_DEVICE)"
 			if [[ -n $current_partition_table ]]; then
-				writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$ROOT_DEVICE" "$current_partition_table"
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$ROOT_DEVICE"
+				echo "$current_partition_table"
 			else
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_PARTITION_TABLE_DEFINED "$ROOT_DEVICE"
 				if (( $SKIP_SFDISK )); then
@@ -7661,7 +7661,8 @@ function restorePartitionBasedBackup() {
 	fi
 
 	current_partition_table="$(listDeviceInfo $RESTORE_DEVICE)"
-	writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$RESTORE_DEVICE" "$current_partition_table"
+	writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$RESTORE_DEVICE"
+	echo "$current_partition_table"
 	writeToConsole $MSG_LEVEL_MINIMAL $MSG_WARN_RESTORE_PARTITION_DEVICE_OVERWRITTEN "$RESTORE_DEVICE"
 
 	if ! askYesNo; then
