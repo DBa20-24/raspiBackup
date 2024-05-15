@@ -7584,7 +7584,7 @@ function restoreNonPartitionBasedBackup() {
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_PARTITION_TABLE_DEFINED "$RESTORE_DEVICE"
 		fi
 	else
-		if [[ $ROOT_DEVICE =~ /dev/mmcblk0 || $ROOT_DEVICE =~ "/dev/loop" || $ROOT_DEVICE =~ /dev/nvme0n1 ]]; then
+		if [[ $ROOT_DEVICE =~ /dev/mmcblk0 || $ROOT_DEVICE =~ "/dev/loop" || $ROOT_DEVICE =~ /dev/nvme[0-9]n[0-9] ]]; then
 			ROOT_DEVICE=$(sed -E 's/p[0-9]+$//' <<< $ROOT_PARTITION)
 		else
 			ROOT_DEVICE=$(sed -E 's/[0-9]+$//' <<< $ROOT_PARTITION)
