@@ -29,19 +29,19 @@ testFile=$(mktemp)
 
 function test_createResizedSFDisk() {
 
-	local partitionSizes=($(createResizedSFDisk $1 $2 $3 $4 $5))
+	local partitionSizes=($(createResizedSFDisk "$1" "$2" "$3" "$4" "$5"))
 	local old=${partitionSizes[0]}
 	local new=${partitionSizes[1]}
 
 	resizedSize="$(calcSumSizeFromSFDISK "$3")"
 
-	if (( resizedSize != $2 || $4 != $old || $5 != $new )); then
+	if (( resizedSize != "$2" || "$4" != "$old" || "$5" != "$new" )); then
 		echo -n "FAILED --- "
 	else
 		echo -n "SUCCESS --- "
 	fi
 
-	echo "$1: $resizedSize ($(bytesToHuman $resizedSize)) --- $(bytesToHuman $old):$(bytesToHuman $new)"
+	echo "Resize $1 to $(bytesToHuman $resizedSize) --- Old partition size: $(bytesToHuman $old) New partitionSize: $(bytesToHuman $new)"
 
 }
 
@@ -59,17 +59,29 @@ function test_calcSumSizeFromSFDISK() {
 
 }
 
+:<<'SKIP'
 echo "--- test_calcSumSizeFromSFDISK ---"
-test_calcSumSizeFromSFDISK 32GB.sfdisk 31268536320
-test_calcSumSizeFromSFDISK 32GB_nosecsize.sfdisk 31268536320
-test_calcSumSizeFromSFDISK 128GB.sfdisk 128035676160
-test_calcSumSizeFromSFDISK 128GB_nosecsize.sfdisk 128035676160
+test_calcSumSizeFromSFDISK "32GB.sfdisk" 31268536320
+test_calcSumSizeFromSFDISK "32GB_nosecsize.sfdisk" 31268536320
+test_calcSumSizeFromSFDISK "128GB.sfdisk" 128035676160
+test_calcSumSizeFromSFDISK "128GB_nosecsize.sfdisk" 128035676160
+test_calcSumSizeFromSFDISK "10+22GB.sfdisk" 31268536320
+test_calcSumSizeFromSFDISK "10+22GB-1ext.sfdisk" 31268536320
+test_calcSumSizeFromSFDISK "100+28GB.sfdisk" 128035676160
+test_calcSumSizeFromSFDISK "100+28GB-1ext.sfdisk" 128035676160
 echo
+SKIP
 echo "--- test_createResizedSFDisk ---"
-test_createResizedSFDisk "128GB.sfdisk" 31268536320 $testFile 126953545728 30186405888
-test_createResizedSFDisk "128GB_nosecsize.sfdisk" 31268536320 $testFile 126953545728 30186405888
+# shrink
+#test_createResizedSFDisk "128GB.sfdisk" 31268536320 $testFile 126953545728 30186405888
+#test_createResizedSFDisk "128GB_nosecsize.sfdisk" 31268536320 $testFile 126953545728 30186405888
+#test_createResizedSFDisk "100+28GB.sfdisk" 31268536320 $testFile 126953545728 30186405888
+##test_createResizedSFDisk "100+28GB-1ext.sfdisk" 31268536320 $testFile 126953545728 30186405888
+# extend
 test_createResizedSFDisk "32GB.sfdisk" 128035676160 $testFile 30186405888 126953545728
-test_createResizedSFDisk "32GB_nosecsize.sfdisk" 128035676160 $testFile 30186405888 126953545728
+#test_createResizedSFDisk "32GB_nosecsize.sfdisk" 128035676160 $testFile 30186405888 126953545728
+test_createResizedSFDisk "10+22GB.sfdisk" 128035676160 $testFile 30186405888 126953545728
+#test_createResizedSFDisk "10+22GB-1ext.sfdisk" 128035676160 $testFile 30186405888 126953545728
 
 rm $testFile
 

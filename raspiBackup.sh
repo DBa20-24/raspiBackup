@@ -4104,24 +4104,42 @@ function calcSumSizeFromSFDISK() { # sfdisk file name
 	fi
 
 	local line
-	line="$(tail -1 $file)"
-	if [[ $line =~ $partitionregex ]]; then
-		local p=${BASH_REMATCH[1]}
-		local start=${BASH_REMATCH[2]}
-		local size=${BASH_REMATCH[3]}
-		local id=${BASH_REMATCH[4]}
+	local lineNo=0
 
-		if (( $id != 83 )); then
-			assertionFailed $LINENO "Last partition is no Linux partition"
+	while IFS="" read line; do
+	
+		(( lineNo++ ))
+		
+		if [[ -z $line || $line =~ ^[^#]*# ]]; then
+			continue
 		fi
+		
+		if [[ $line =~ $partitionregex ]]; then
+			local p=${BASH_REMATCH[1]}
+			local start=${BASH_REMATCH[2]}
+			local size=${BASH_REMATCH[3]}
+			local id=${BASH_REMATCH[4]}
 
-		(( sumSize = ( start + size) * sectorSize ))
-		echo "$sumSize"
-	else
+			if [[ $id == 85 || $id == 5 ]]; then
+				continue
+			fi
+				
+			if (( $id != 83 && $id != c )); then
+				assertionFailed $LINENO "Last partition is no Linux partition"
+			fi
+
+			(( sumSize = ( start + size) * sectorSize ))
+			logItem "$p: Start: $start - Size: $((size*512)) : $(bytesToHuman $((size*512))) - SumSize: $sumSize : $(bytesToHuman $sumSize)"
+		fi
+	done < $file
+
+	if (( sumSize == 0 )) || [[ $id != 83 ]]; then
 		assertionFailed $LINENO "No matching last partition found"
 	fi
 
-	logExit "$sumSize"
+	echo "$sumSize"
+
+	logExit "$sumSize - $(bytesToHuman $sumSize)"
 }
 
 function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_target_filename -> oldPartitionSize newPartitionSize
@@ -4153,10 +4171,17 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 
 	cp "$sourceFile" "$targetFile"
 
-	if (( sourceSize != targetSize )); then
+	local line
 
-		local line
-		line="$(tail -1 $targetFile)"
+	logItem "sourceSize: $(bytesToHuman $(($sourceSize))) targetSize: $(bytesToHuman $(($targetSize)))"
+
+	while IFS="" read line; do
+	
+		(( lineNo++ ))
+		
+		if [[ -z $line || $line =~ ^[^#]*# ]]; then
+			continue
+		fi
 
 		if [[ $line =~ $partitionregex ]]; then
 			local p=${BASH_REMATCH[1]}
@@ -4164,11 +4189,15 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 			local size=${BASH_REMATCH[3]}
 			local id=${BASH_REMATCH[4]}
 
-			if (( $id != 83 )); then
+			if [[ $id == 85 || $id == 5 ]]; then
+				continue
+			fi
+				
+			if (( $id != 83 && $id != c )); then
 				assertionFailed $LINENO "Last partition is no Linux partition"
 			fi
 
-			(( oldPartitionSize = ( size - start ) * sectorSize ))
+			(( oldPartitionSize = size * sectorSize ))
 
 			if (( sourceSize > targetSize )); then
 				(( newSize = ( size - ( sourceSize - targetSize ) / sectorSize ) ))
@@ -4177,16 +4206,21 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 			fi
 
 			(( newPartitionSize = ( newSize - start ) * sectorSize ))
-
-			sed -i "s/${size}/${newSize}/" $targetFile
-
-		else
-			assertionFailed $LINENO "Last partition is no Linux partition"
+		
+			logItem "$p - Start: $start - Size: $((size*512)) - id: $id - newSize: $newSize "
+			logItem "oldPartitionSize: $(bytesToHuman $(($oldPartitionSize)))  newPartitionSize $(bytesToHuman $(($newPartitionSize)))"
 		fi
+
+	done < $sourceFile
+
+	if (( newSize == 0 )) || [[ $id != 83 ]]; then
+		assertionFailed $LINENO "No matching last partition found"
 	fi
 
-	logItem "Old: $oldPartitionSize - New: $newPartitionSize"
+	sed -i "s/${size}/${newSize}/" $targetFile
 
+	logItem "Old: $oldPartitionSize ($(bytesToHuman $oldPartitionSize)) - New: $newPartitionSize $(bytesToHuman $newPartitionSize))"
+	
 	logCommand "cat $targetFile"
 
 	local ret="$oldPartitionSize $newPartitionSize"
