@@ -4209,14 +4209,14 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 				(( newSize = ( size + ( targetSize - sourceSize ) / sectorSize ) ))
 			fi
 
-			if (( newSize < 0 )); then			# last partition cann be shrunk, too small
-				newPartitionSize=-1
+			if (( newSize > start )); then
+				(( newPartitionSize = ( newSize - start ) * sectorSize ))
 			else
-				if (( newSize > start )); then
-					(( newPartitionSize = ( newSize - start ) * sectorSize ))
-				else
-					(( newPartitionSize = ( start - newSize ) * sectorSize ))
-				fi
+				(( newPartitionSize = ( start - newSize ) * sectorSize ))
+			fi
+
+			if (( newSize < 0 )); then			# last partition too small to shrink
+				((newPartitionSize=-newPartitionSize))
 			fi
 			
 			logItem "$p - Start: $start - Size: $((size*512)) - id: $id - newSize: $newSize "
