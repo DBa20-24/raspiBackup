@@ -29,23 +29,32 @@ testFile=$(mktemp)
 
 (( GIB = 1024*1024*1024 ))
 
-function test_createResizedSFDisk() {
+function test_createResizedSFDisk() { 
 
-	local partitionSizes=($(createResizedSFDisk "$1" "$2" "$3" "$4" "$5"))
+	local partitionSizes=($(createResizedSFDisk "$1" "$2" "$testFile"))
 	local old=${partitionSizes[0]}
 	local new=${partitionSizes[1]}
 
-	resizedSize="$(calcSumSizeFromSFDISK "$3")"
+	local fail=0
 
-#	if (( resizedSize != "$2" || "$4" != "$old" || "$5" != "$new" )); then
+	resizedSize="$(calcSumSizeFromSFDISK "$testFile")"
+
 	if (( resizedSize != "$2" )); then
-		echo -ne "FAILED --- Expected: $2 ($(bytesToHuman $2)) - Received: $resizedSize ($(bytesToHuman $resizedSize))\n"
+		if [[ -z $3 ]] || ( [[ -n $3 ]] && (( new > 0 )) ); then
+			echo -n "FLD --- "
+			fail=1
+		else
+			echo -n "OKN --- "
+		fi
 	else
-		echo -n "SUCCESS --- "
+		echo -n "OK  --- "
 	fi
 
 	echo "Resize $1 to $(bytesToHuman $resizedSize) --- Old partition size: $(bytesToHuman $old) New partitionSize: $(bytesToHuman $new)"
 
+	if (( fail )); then	
+		echo "Expected: $2 ($(bytesToHuman $2)) - Received: $resizedSize ($(bytesToHuman $resizedSize))"
+	fi
 }
 
 function test_calcSumSizeFromSFDISK() {
@@ -78,10 +87,12 @@ SKIP
 
 echo "--- test_createResizedSFDisk ---"
 # shrink
-test_createResizedSFDisk "128GB.sfdisk" 31268536320 $testFile 126953545728 30186405888
-test_createResizedSFDisk "128GB_nosecsize.sfdisk" 31268536320 $testFile 126953545728 30186405888
-test_createResizedSFDisk "100+28GB.sfdisk" 31268536320 $testFile 126953545728 30186405888
-test_createResizedSFDisk "100+28GB-1ext.sfdisk" 31268536320 $testFile 126953545728 30186405888
+test_createResizedSFDisk "128GB.sfdisk" 31268536320 
+test_createResizedSFDisk "128GB_nosecsize.sfdisk" 31268536320 
+test_createResizedSFDisk "28+100GB.sfdisk" 31268536320 
+test_createResizedSFDisk "28+100GB-1ext.sfdisk" 31268536320 
+test_createResizedSFDisk "28+5+95GB-2ext.sfdisk" 31268536320 
+test_createResizedSFDisk "100+28GB.sfdisk" 31268536320 FAIL
 # extend
 test_createResizedSFDisk "32GB.sfdisk" 128035676160 $testFile 30186405888 126953545728
 test_createResizedSFDisk "32GB_nosecsize.sfdisk" 128035676160 $testFile 30186405888 126953545728

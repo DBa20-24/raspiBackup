@@ -4142,6 +4142,10 @@ function calcSumSizeFromSFDISK() { # sfdisk file name
 	logExit "$sumSize - $(bytesToHuman $sumSize)"
 }
 
+
+# Return oldParttiionSize and newPartitionsize of modified last partition
+# if last partition is too small to shrink the newPartitionSize == -1
+
 function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_target_filename -> oldPartitionSize newPartitionSize
 
 	logEntry "$@"
@@ -4173,7 +4177,7 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 
 	local line
 
-	logItem "sourceSize: $(bytesToHuman $(($sourceSize))) targetSize: $(bytesToHuman $(($targetSize)))"
+	logItem "sourceSize: $sourceSize ($(bytesToHuman $(($sourceSize)))) targetSize: $targetSize ($(bytesToHuman $(($targetSize))))"
 
 	while IFS="" read line; do
 	
@@ -4205,8 +4209,16 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 				(( newSize = ( size + ( targetSize - sourceSize ) / sectorSize ) ))
 			fi
 
-			(( newPartitionSize = ( newSize - start ) * sectorSize ))
-		
+			if (( newSize < 0 )); then			# last partition cann be shrunk, too small
+				newPartitionSize=-1
+			else
+				if (( newSize > start )); then
+					(( newPartitionSize = ( newSize - start ) * sectorSize ))
+				else
+					(( newPartitionSize = ( start - newSize ) * sectorSize ))
+				fi
+			fi
+			
 			logItem "$p - Start: $start - Size: $((size*512)) - id: $id - newSize: $newSize "
 			logItem "oldPartitionSize: $(bytesToHuman $(($oldPartitionSize)))  newPartitionSize $(bytesToHuman $(($newPartitionSize)))"
 		fi
@@ -4217,11 +4229,12 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 		assertionFailed $LINENO "No matching last partition found"
 	fi
 
-	sed -i "s/${size}/${newSize}/" $targetFile
+	if (( newSize > 0 )); then
+		sed -i "s/${size}/${newSize}/" $targetFile
+		logCommand "cat $targetFile"
+	fi
 
 	logItem "Old: $oldPartitionSize ($(bytesToHuman $oldPartitionSize)) - New: $newPartitionSize $(bytesToHuman $newPartitionSize))"
-	
-	logCommand "cat $targetFile"
 
 	local ret="$oldPartitionSize $newPartitionSize"
 
