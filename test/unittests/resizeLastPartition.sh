@@ -48,6 +48,7 @@ function test_createResizedSFDisk() {
 		if [[ -z $3 ]] || (( new > 0 )); then
 			echo -n "??? --- "
 			fail=1
+			(( errors ++ ))
 		else
 			echo -n "OKN --- "
 		fi
@@ -70,13 +71,16 @@ function test_calcSumSizeFromSFDISK() {
 
 	if (( size != $2 )); then
 		echo -ne "??? --- Expected: $2 ($(bytesToHuman $2)) - Received: $size ($(bytesToHuman $size))\n"
+		(( errors ++ ))
 	else
 		echo -ne "OK --- $size ($(bytesToHuman $size))\n"
 	fi
 
 }
 
-# <<'SKIP'
+errors=0
+
+ <<'SKIP'
 echo "--- test_calcSumSizeFromSFDISK ---"
 echo
 test_calcSumSizeFromSFDISK "32GB.sfdisk" 31268536320
@@ -97,12 +101,15 @@ test_calcSumSizeFromSFDISK "28+95+5GB-2ext.sfdisk" 128035676160
 test_calcSumSizeFromSFDISK "mmcblk0.sfdisk" 31268536320
 test_calcSumSizeFromSFDISK "mmcblk0-2ext.sfdisk" 31268536320
 test_calcSumSizeFromSFDISK "nvme0n1.sfdisk" 128035676160
-#SKIP
+SKIP
 
 echo
 echo "--- test_createResizedSFDisk ---"
 echo
 # shrink
+#test_createResizedSFDisk "18-11GB.sfdisk" $((32000000000 - 11999461376 ))
+test_createResizedSFDisk "18-11GB.sfdisk" $((32000000000 - ( 11999461376 + 512 ) ))
+exit
 test_createResizedSFDisk "128GB.sfdisk" 31268536320
 test_createResizedSFDisk "128GB_nosecsize.sfdisk" 31268536320
 test_createResizedSFDisk "28+100GB.sfdisk" 31268536320
@@ -110,6 +117,7 @@ test_createResizedSFDisk "28+100GB-1ext.sfdisk" 31268536320
 test_createResizedSFDisk "28+5+95GB-2ext.sfdisk" 31268536320
 test_createResizedSFDisk "28+95+5GB-2ext.sfdisk" 31268536320 FAIL
 test_createResizedSFDisk "100+28GB.sfdisk" 31268536320 FAIL
+test_createResizedSFDisk "18-11GB.sfdisk"
 # extend
 test_createResizedSFDisk "32GB.sfdisk" 128035676160
 test_createResizedSFDisk "32GB_nosecsize.sfdisk" 128035676160
@@ -118,4 +126,14 @@ test_createResizedSFDisk "10+22GB-1ext.sfdisk" 128035676160
 
 #rm $testFile
 mv $testFile test.sfdisk
+
+echo
+if (( errors > 0 )); then
+	echo "??? Test failed with §errors errors"
+	exit 1
+else
+	echo "!!! Test completed without errors"
+	exit 0
+fi
+
 

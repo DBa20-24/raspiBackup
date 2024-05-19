@@ -4190,29 +4190,34 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 
 			if (( sourceSize > targetSize )); then
 				(( newSize = ( size - ( sourceSize - targetSize ) / sectorSize ) ))
-			else
+			elif (( sourceSize < targetSize )); then
 				(( newSize = ( size + ( targetSize - sourceSize ) / sectorSize ) ))
-			fi
-
-			if (( newSize > start )); then
-				(( newPartitionSize = ( newSize - start ) * sectorSize ))
 			else
-				(( newPartitionSize = ( start - newSize ) * sectorSize ))
+				(( newSize = size ))
 			fi
 
-			logItem "$p - Start: $start - Size: $((size*512)) - id: $id - newSize: $newSize"
-			logItem "oldPartitionSize: $(bytesToHuman $oldPartitionSize) newPartitionSize $(bytesToHuman $newPartitionSize)"
+			if (( newSize > 0 )); then
+				if (( newSize > start )); then
+					(( newPartitionSize = ( newSize - start ) * sectorSize ))
+				else
+					(( newPartitionSize = ( start - newSize ) * sectorSize ))
+				fi
+			else
+				((newPartitionSize=newSize*512))
+			fi
+
+			logItem "$p - Start: $start - Size: $((size*512)) - id: $id"
+			logItem "- newSize: $newSize ($(bytesToHuman $(($newSize*512)))) oldPartitionSize: $(bytesToHuman $oldPartitionSize) newPartitionSize ($(bytesToHuman $newPartitionSize))"
 		fi
 
 	done < $sourceFile
 
-	if (( newSize < 0 )); then			# last partition too small to shrink, return missing size
-		((newPartitionSize=-(newPartitionSize-oldPartitionSize)))
-		logItem "Parition too small: Missing $(bytesToHuman $oldPartitionSize)"
+	if [[ -z newSize ]]; then
+		assertionFailed $LINENO "No last Linux partition found which can be resized"
 	fi
 
-	if (( newSize == 0 )); then
-		assertionFailed $LINENO "No last Linux partition found which can be resized"
+	if (( newSize <= 0 )); then			# last partition too small to shrink, return missing size
+		logItem "Partition too small: Missing $(bytesToHuman $newPartitionSize)"
 	fi
 
 	if (( newSize > 0 )); then
