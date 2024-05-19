@@ -4069,13 +4069,7 @@ function deployMyself() {
 
 }
 
-## partition table of /dev/sdc
-#unit: sectors
-
-#/dev/sdc1 : start=     8192, size=   114688, Id= c
-#/dev/sdc2 : start=   122880, size= 30244864, Id=83
-#/dev/sdc3 : start=        0, size=        0, Id= 0
-#/dev/sdc4 : start=        0, size=        0, Id= 0
+# calculate last used sector
 
 function calcSumSizeFromSFDISK() { # sfdisk file name
 
@@ -4088,15 +4082,13 @@ function calcSumSizeFromSFDISK() { # sfdisk file name
 # /dev/sdb1 : start=          63, size=  1953520002, type=83
 
 	local partitionregex="/dev/.*[p]?([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9a-z]*([0-9a-z]+)"
-	local sumSize=0
-	local sectorSize
+	local sectorSize=512 # default
 
 	logCommand "cat $file"
 
-	sectorSize=$(grep "^sector-size:" $file)
-	if (( $? )); then
-		sectorSize=512	# not set in buster and earlier, use default
-	else
+	local sectorSize=512 # default
+
+	if grep -q "^sector-size:" $file; then
 		sectorSize=$(cut -f 2 -d ' ' <<< "$sectorSize")
 		if [[ -z $sectorSize ]]; then
 			assertionFailed $LINENO "Unable to retrieve sectorsize"
@@ -4105,31 +4097,30 @@ function calcSumSizeFromSFDISK() { # sfdisk file name
 
 	local line
 	local lineNo=0
+	local sumSize=0
 
 	while IFS="" read line; do
-	
+
 		(( lineNo++ ))
-		
+
 		if [[ -z $line || $line =~ ^[^#]*# ]]; then
 			continue
 		fi
-		
+
 		if [[ $line =~ $partitionregex ]]; then
 			local p=${BASH_REMATCH[1]}
 			local start=${BASH_REMATCH[2]}
 			local size=${BASH_REMATCH[3]}
 			local id=${BASH_REMATCH[4]}
 
-			if [[ $id == 85 || $id == 5 ]]; then
+			if [[ $id != 83 && $id != 5 && $id != c ]]; then
 				continue
 			fi
-				
-			if (( $id != 83 && $id != c )); then
-				assertionFailed $LINENO "Last partition is no Linux partition"
-			fi
 
-			(( sumSize = ( start + size) * sectorSize ))
+			(( sumSize = (start + size) * sectorSize ))
+
 			logItem "$p: Start: $start - Size: $((size*512)) : $(bytesToHuman $((size*512))) - SumSize: $sumSize : $(bytesToHuman $sumSize)"
+
 		fi
 	done < $file
 
@@ -4154,15 +4145,13 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 	local targetSize="$2"
 	local targetFile="$3"
 
-	local newSize sectorSize
+	local newSize
 	local oldPartitionSize newPartitionSize
 
 	local partitionregex="/dev/.*[p]?([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9a-z]*([0-9a-z]+)"
 
-	sectorSize=$(grep "^sector-size:" $sourceFile)
-	if (( $? )); then
-		sectorSize=512	# not set in buster and earlier, use default
-	else
+	local sectorSize=512
+	if -q grep "^sector-size:" $sourceFile; then
 		sectorSize=$(cut -f 2 -d ' ' <<< "$sectorSize")
 		if [[ -z $sectorSize ]]; then
 			assertionFailed $LINENO "Unable to retrieve sector size"
@@ -4180,9 +4169,9 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 	logItem "sourceSize: $sourceSize ($(bytesToHuman $(($sourceSize)))) targetSize: $targetSize ($(bytesToHuman $(($targetSize))))"
 
 	while IFS="" read line; do
-	
+
 		(( lineNo++ ))
-		
+
 		if [[ -z $line || $line =~ ^[^#]*# ]]; then
 			continue
 		fi
@@ -4193,12 +4182,8 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 			local size=${BASH_REMATCH[3]}
 			local id=${BASH_REMATCH[4]}
 
-			if [[ $id == 85 || $id == 5 ]]; then
+			if [[ $id != 83 ]]; then
 				continue
-			fi
-				
-			if (( $id != 83 && $id != c )); then
-				assertionFailed $LINENO "Last partition is no Linux partition"
 			fi
 
 			(( oldPartitionSize = size * sectorSize ))
@@ -4215,18 +4200,19 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 				(( newPartitionSize = ( start - newSize ) * sectorSize ))
 			fi
 
-			if (( newSize < 0 )); then			# last partition too small to shrink, return missing size
-				((newPartitionSize=-(newPartitionSize-oldPartitionSize)))
-			fi
-			
-			logItem "$p - Start: $start - Size: $((size*512)) - id: $id - newSize: $newSize "
-			logItem "oldPartitionSize: $(bytesToHuman $(($oldPartitionSize)))  newPartitionSize $(bytesToHuman $(($newPartitionSize)))"
+			logItem "$p - Start: $start - Size: $((size*512)) - id: $id - newSize: $newSize"
+			logItem "oldPartitionSize: $(bytesToHuman $oldPartitionSize) newPartitionSize $(bytesToHuman $newPartitionSize)"
 		fi
 
 	done < $sourceFile
 
-	if (( newSize == 0 )) || [[ $id != 83 ]]; then
-		assertionFailed $LINENO "No matching last partition found"
+	if (( newSize < 0 )); then			# last partition too small to shrink, return missing size
+		((newPartitionSize=-(newPartitionSize-oldPartitionSize)))
+		logItem "Parition too small: Missing $(bytesToHuman $oldPartitionSize)"
+	fi
+
+	if (( newSize == 0 )); then
+		assertionFailed $LINENO "No last Linux partition found which can be resized"
 	fi
 
 	if (( newSize > 0 )); then
@@ -5966,9 +5952,9 @@ function formatBackupDevice() {
 
 	if (( $SKIP_SFDISK )); then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_SKIP_CREATING_PARTITIONS
-		
+
 	elif [[ $BACKUPTYPE != $BACKUPTYPE_DD && $BACKUPTYPE != $BACKUPTYPE_DDZ ]]; then
-	
+
 		writeToConsole $MSG_LEVEL_DETAILED $MSG_PARTITIONING_SDCARD "$RESTORE_DEVICE"
 		writeToConsole $MSG_LEVEL_DETAILED $MSG_CREATING_PARTITIONS "$RESTORE_DEVICE"
 
@@ -6037,10 +6023,10 @@ function formatBackupDevice() {
 					fi
 
 					if (( ! PARTITIONBASED_BACKUP && ( ${sourceValues[2]} == 0 || ${sourceValues[3]} == 0 ) )); then
-							writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_R_OPTION 
-							exitError $RC_MISC_ERROR							
+							writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_R_OPTION
+							exitError $RC_MISC_ERROR
 					fi
-						
+
 					local partitionSizes
 					partitionSizes=( $(createResizedSFDisk "$SF_FILE" "$targetSDSize" "$MODIFIED_SFDISK") )
 

@@ -1,0 +1,11 @@
+label: dos
+label-id: 0x7dfb90df
+device: /dev/loop2
+unit: sectors
+
+/dev/loop2p1 : start=        2048, size=     1048576, type=83
+/dev/loop2p2 : start=     1050624, size=    20971520, type=83
+/dev/loop2p3 : start=    22022144, size=    20971520, type=83
+/dev/loop2p4 : start=    42993664, size=    18077696, type=5
+/dev/loop2p5 : start=    42995712, size=     8388608, type=83
+/dev/loop2p6 : start=    51386368, size=     9684992, type=83
