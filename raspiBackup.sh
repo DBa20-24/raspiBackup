@@ -4203,7 +4203,7 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 					(( newPartitionSize = ( start - newSize ) * sectorSize ))
 				fi
 			else
-				((newPartitionSize=newSize*512))
+				((newPartitionSize=(newSize-1)*512))		# too small, adjust for 512 division truncation gap
 			fi
 
 			logItem "$p - Start: $start - Size: $((size*512)) - id: $id"
@@ -4216,7 +4216,7 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 		assertionFailed $LINENO "No last Linux partition found which can be resized"
 	fi
 
-	if (( newSize <= 0 )); then			# last partition too small to shrink, return missing size
+	if (( newPartitionSize <= 0 )); then			# last partition too small to shrink, return missing size
 		logItem "Partition too small: Missing $(bytesToHuman $newPartitionSize)"
 	fi
 

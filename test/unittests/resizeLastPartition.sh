@@ -2,7 +2,7 @@
 
 #######################################################################################################################
 #
-# 	 Unit test for sfdisk resize of last partition for raspiBackup
+# 	 Unit test for sfdisk resize of last partition
 #
 #######################################################################################################################
 #
@@ -80,7 +80,7 @@ function test_calcSumSizeFromSFDISK() {
 
 errors=0
 
- <<'SKIP'
+# <<'SKIP'
 echo "--- test_calcSumSizeFromSFDISK ---"
 echo
 test_calcSumSizeFromSFDISK "32GB.sfdisk" 31268536320
@@ -101,15 +101,14 @@ test_calcSumSizeFromSFDISK "28+95+5GB-2ext.sfdisk" 128035676160
 test_calcSumSizeFromSFDISK "mmcblk0.sfdisk" 31268536320
 test_calcSumSizeFromSFDISK "mmcblk0-2ext.sfdisk" 31268536320
 test_calcSumSizeFromSFDISK "nvme0n1.sfdisk" 128035676160
-SKIP
+#SKIP
 
 echo
 echo "--- test_createResizedSFDisk ---"
 echo
 # shrink
-#test_createResizedSFDisk "18-11GB.sfdisk" $((32000000000 - 11999461376 ))
-test_createResizedSFDisk "18-11GB.sfdisk" $((32000000000 - ( 11999461376 + 512 ) ))
-exit
+test_createResizedSFDisk "18-11GB.sfdisk" $((32000000000 - ( 11999461376 - 512) )) 
+test_createResizedSFDisk "18-11GB.sfdisk" $((32000000000 - ( 11999461376 + 1) )) FAIL
 test_createResizedSFDisk "128GB.sfdisk" 31268536320
 test_createResizedSFDisk "128GB_nosecsize.sfdisk" 31268536320
 test_createResizedSFDisk "28+100GB.sfdisk" 31268536320
@@ -117,19 +116,18 @@ test_createResizedSFDisk "28+100GB-1ext.sfdisk" 31268536320
 test_createResizedSFDisk "28+5+95GB-2ext.sfdisk" 31268536320
 test_createResizedSFDisk "28+95+5GB-2ext.sfdisk" 31268536320 FAIL
 test_createResizedSFDisk "100+28GB.sfdisk" 31268536320 FAIL
-test_createResizedSFDisk "18-11GB.sfdisk"
 # extend
 test_createResizedSFDisk "32GB.sfdisk" 128035676160
 test_createResizedSFDisk "32GB_nosecsize.sfdisk" 128035676160
 test_createResizedSFDisk "10+22GB.sfdisk" 128035676160 
 test_createResizedSFDisk "10+22GB-1ext.sfdisk" 128035676160 
 
-#rm $testFile
-mv $testFile test.sfdisk
+rm $testFile
+#mv $testFile test.sfdisk
 
 echo
 if (( errors > 0 )); then
-	echo "??? Test failed with §errors errors"
+	echo "??? Test failed with $errors errors"
 	exit 1
 else
 	echo "!!! Test completed without errors"
