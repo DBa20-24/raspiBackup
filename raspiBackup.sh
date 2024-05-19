@@ -4151,7 +4151,7 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 	local partitionregex="/dev/.*[p]?([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9a-z]*([0-9a-z]+)"
 
 	local sectorSize=512
-	if -q grep "^sector-size:" $sourceFile; then
+	if grep -q "^sector-size:" $sourceFile; then
 		sectorSize=$(cut -f 2 -d ' ' <<< "$sectorSize")
 		if [[ -z $sectorSize ]]; then
 			assertionFailed $LINENO "Unable to retrieve sector size"
