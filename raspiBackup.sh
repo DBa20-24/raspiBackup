@@ -4137,15 +4137,14 @@ function calcSumSizeFromSFDISK() { # sfdisk file name
 # Return oldParttiionSize and newPartitionsize of modified last partition
 # if last partition is too small to shrink the newPartitionSize == -1
 
-function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_target_filename -> oldPartitionSize newPartitionSize
+function createResizedSFDisk() { # sfdisk_source_filename targetDeviceSize sfdisk_target_filename -> oldPartitionSize newPartitionSize
 
 	logEntry "$@"
 
 	local sourceFile="$1"
-	local targetSize="$2"
+	local targetDeviceSize="$2"
 	local targetFile="$3"
 
-	local newSize
 	local oldPartitionSize newPartitionSize
 
 	local partitionregex="/dev/.*[p]?([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9a-z]*([0-9a-z]+)"
@@ -4160,13 +4159,13 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 
 	logCommand "cat $sourceFile"
 
-	local sourceSize=$(calcSumSizeFromSFDISK "$sourceFile")
+	local sourceDeviceSize=$(calcSumSizeFromSFDISK "$sourceFile")
 
 	cp "$sourceFile" "$targetFile"
 
-	local line
+	local line newSize diffSize
 
-	logItem "sourceSize: $sourceSize ($(bytesToHuman $(($sourceSize)))) targetSize: $targetSize ($(bytesToHuman $(($targetSize))))"
+	logItem "sourceDeviceSize: $sourceDeviceSize ($(bytesToHuman $(($sourceDeviceSize)))) targetDeviceSize: $targetDeviceSize ($(bytesToHuman $(($targetDeviceSize))))"
 
 	while IFS="" read line; do
 
@@ -4182,29 +4181,50 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 			local size=${BASH_REMATCH[3]}
 			local id=${BASH_REMATCH[4]}
 
+			logItem "$p - Start: $start - Size: $((size*512)) - id: $id"
+
+			if [[ $id == 5 ]]; then	
+				local p5==$p
+				local start5=$start
+				local size5=$size
+				local id5=$id
+				continue
+			fi
+
 			if [[ $id != 83 ]]; then
 				continue
 			fi
 
+			logItem "--- Processing partition $p ---"
+
 			(( oldPartitionSize = size * sectorSize ))
 
-			if (( sourceSize > targetSize )); then
-				(( newSize = ( size - ( sourceSize - targetSize ) / sectorSize ) ))
-			elif (( sourceSize < targetSize )); then
-				(( newSize = ( size + ( targetSize - sourceSize ) / sectorSize ) ))
+			logItem "OldPartitionSize: $oldPartitionSize ($(bytesToHuman $oldPartitionSize)))"
+
+			if (( sourceDeviceSize > targetDeviceSize )); then
+				logItem "newSize = ( $size - ( $sourceDeviceSize - $targetDeviceSize ) / $sectorSize )"
+				(( newSize = ( size - ( sourceDeviceSize - targetDeviceSize ) / sectorSize ) ))
+			elif (( sourceDeviceSize < targetDeviceSize )); then
+				logItem "newSize = ( $size + ( $targetDeviceSize - $sourceDeviceSize ) / $sectorSize )"
+				(( newSize = ( size + ( targetDeviceSize - sourceDeviceSize ) / sectorSize ) ))
 			else
+				logItem "newSize = $size"
 				(( newSize = size ))
 			fi
 
+			(( diffSize = newSize - size ))
+
+			logItem "NewSize: $newSize ($(bytesToHuman $((newSize*512)))) DiffSize: $diffSize ($(bytesToHuman $((diffSize*512)))"
+
 			if (( newSize > 0 )); then
-				if (( newSize > start )); then
-					(( newPartitionSize = ( newSize - start ) * sectorSize ))
-				else
-					(( newPartitionSize = ( start - newSize ) * sectorSize ))
-				fi
+				logItem "(( newPartitionSize = ( $newSize * $sectorSize )))"
+				(( newPartitionSize = ( newSize * sectorSize )))
 			else
-				((newPartitionSize=(newSize-1)*512))		# too small, adjust for 512 division truncation gap
+				logItem "((newPartitionSize =($newSize-1) * $sectorSize ))"		# too small, adjust for 512 division truncation gap
+				(( newPartitionSize = (newSize-1) * sectorSize ))		# too small, adjust for 512 division truncation gap
 			fi
+
+			logItem "NewPartitionSize: $newPartitionSize ($(bytesToHuman $newPartitionSize)))"
 
 			logItem "$p - Start: $start - Size: $((size*512)) - id: $id"
 			logItem "- newSize: $newSize ($(bytesToHuman $(($newSize*512)))) oldPartitionSize: $(bytesToHuman $oldPartitionSize) newPartitionSize ($(bytesToHuman $newPartitionSize))"
@@ -4221,11 +4241,21 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 	fi
 
 	if (( newSize > 0 )); then
-		sed -i "s/${size}/${newSize}/" $targetFile
+#		sed -E 's/(p1 :.+size=.+)1048576/\14711/'
+#		sed -E -E -i "s/(p$p :.+size=.+)${size}/\1${newSize}/" $targetFile
+		sed -E -i "s/${size}/${newSize}/" $targetFile
+		if [[ -n $p5 ]]; then
+			local newP5Size
+			logItem "(( newP5Size = $size5 + $diffSize ))"
+			(( newP5Size = size5 + diffSize ))
+			sed -i "s/${size5}/${newP5Size}/" $targetFile
+		fi
 		logCommand "cat $targetFile"
 	fi
 
 	logItem "Old: $oldPartitionSize ($(bytesToHuman $oldPartitionSize)) - New: $newPartitionSize $(bytesToHuman $newPartitionSize))"
+
+	local targetSize=$(calcSumSizeFromSFDISK "$targetFile")
 
 	local ret="$oldPartitionSize $newPartitionSize"
 
@@ -5674,7 +5704,7 @@ function backupTar() {
 		source="."
 		devroot="."
 		sourceDir="$TEMPORARY_MOUNTPOINT_ROOT/$partition"
-		target="\"${BACKUPTARGET_DIR}/$partition${FILE_EXTENSION[$BACKUPTYPE]}\""
+		target="${BACKUPTARGET_DIR}/$partition${FILE_EXTENSION[$BACKUPTYPE]}"
 	else
 		bootPartitionBackup
 		source="/"
@@ -5806,7 +5836,7 @@ function backupRsync() { # partition number (for partition based backup)
 
 	if (( $PARTITIONBASED_BACKUP )); then
 		partition="${BOOT_PARTITION_PREFIX}$1"
-		target="\"${BACKUPTARGET_DIR}\""
+		target="${BACKUPTARGET_DIR}"
 		source="$TEMPORARY_MOUNTPOINT_ROOT/$partition"
 
 		lastBackupDir=$(find "$BACKUPTARGET_ROOT" -maxdepth 1 -type d -name "*-$BACKUPTYPE-*" ! -name $BACKUPFILE 2>>/dev/null | sort | tail -n 1)
