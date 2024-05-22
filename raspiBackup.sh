@@ -4088,7 +4088,7 @@ function calcSumSizeFromSFDISK() { # sfdisk file name
 	local partitionregex="/dev/.*[p]?([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9a-z]*([0-9a-z]+)"
 	local sectorSize=512 # default
 
-	logCommand "cat $file"
+	[[ -v RESIZE_FSDISK ]] && logCommand "cat $file"
 
 	local sectorSize=512 # default
 
@@ -4123,7 +4123,7 @@ function calcSumSizeFromSFDISK() { # sfdisk file name
 
 			(( sumSize = (start + size) * sectorSize ))
 
-			logItem "$p: Start: $start - Size: $((size*512)) : $(bytesToHuman $((size*512))) - SumSize: $sumSize : $(bytesToHuman $sumSize)"
+			[[ -v RESIZE_FSDISK ]] && logItem "$p: Start: $start - Size: $((size*512)) : $(bytesToHuman $((size*512))) - SumSize: $sumSize : $(bytesToHuman $sumSize)"
 
 		fi
 	done < $file
