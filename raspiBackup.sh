@@ -966,10 +966,10 @@ MSG_DE[$MSG_LANGUAGE_NOT_SUPPORTED]="RBK0096I: Die Sprache %s wird nicht unterst
 MSG_FI[$MSG_LANGUAGE_NOT_SUPPORTED]="RBK0096I: Kieli %s ei ole tuettu."
 MSG_FR[$MSG_LANGUAGE_NOT_SUPPORTED]="RBK0096I: Langue %s non prise en charge."
 MSG_PARTITIONING_SDCARD=97
-MSG_EN[$MSG_PARTITIONING_SDCARD]="RBK0097I: Partitioning and formating %s."
-MSG_DE[$MSG_PARTITIONING_SDCARD]="RBK0097I: Partitioniere und formatiere %s."
-MSG_FI[$MSG_PARTITIONING_SDCARD]="RBK0097I: Osioidaan ja alustetaan %s."
-MSG_FR[$MSG_PARTITIONING_SDCARD]="RBK0097I: Partitionnement et formatage %s."
+MSG_EN[$MSG_PARTITIONING_SDCARD]="RBK0097W: Partitioning and formating %s."
+MSG_DE[$MSG_PARTITIONING_SDCARD]="RBK0097W: Partitioniere und formatiere %s."
+MSG_FI[$MSG_PARTITIONING_SDCARD]="RBK0097W: Osioidaan ja alustetaan %s."
+MSG_FR[$MSG_PARTITIONING_SDCARD]="RBK0097W: Partitionnement et formatage %s."
 MSG_FORMATTING=98
 MSG_EN[$MSG_FORMATTING]="RBK0098I: Formatting partition %s with %s (%s)."
 MSG_DE[$MSG_FORMATTING]="RBK0098I: Formatiere Partition %s mit %s (%s)."
@@ -1935,7 +1935,7 @@ MSG_CURRENT_CONFIGURATION_UPDATE_REQUIRED=294
 MSG_EN[$MSG_CURRENT_CONFIGURATION_UPDATE_REQUIRED]="RBK0294I: Current configuration version %s has to be be updated to %s."
 MSG_DE[$MSG_CURRENT_CONFIGURATION_UPDATE_REQUIRED]="RBK0294I: Aktuelle Konfigurationsversion %s muss auf Version %s upgraded werden."
 MSG_SYNC_CMDLINE_FSTAB=295
-MSG_EN[$MSG_SYNC_CMDLINE_FSTAB]="RBK0295I: Synchonizing %s and %s."
+MSG_EN[$MSG_SYNC_CMDLINE_FSTAB]="RBK0295I: Synchronizing %s and %s."
 MSG_DE[$MSG_SYNC_CMDLINE_FSTAB]="RBK0295I: %s und %s werden synchronisiert."
 OVERLAY_FILESYSTEM_NOT_SUPPORTED=296
 MSG_EN[$OVERLAY_FILESYSTEM_NOT_SUPPORTED]="RBK0296E: Overlay filesystem is not supported."
@@ -1958,6 +1958,18 @@ MSG_DE[$MSG_TEMPMOVE_FAILED]="RBK0301E: Move des temporären Backupverzeichnisse
 MSG_RESIZED_PARTITION_TOO_SMALL=302
 MSG_EN[$MSG_RESIZED_PARTITION_TOO_SMALL]="RBK0302E: Partition %s on %s with %s is too small. Missing at least %s."
 MSG_DE[$MSG_RESIZED_PARTITION_TOO_SMALL]="RBK0302E: Zu resizende Partition %s auf %s mit %s is zu klein. Es fehlen mindestens %s"
+MSG_SKIP_PARTITION_RESTORE=303
+MSG_EN[$MSG_SKIP_PARTITION_RESTORE]="RBK0302W: Partition %s was not restored to %s."
+MSG_DE[$MSG_SKIP_PARTITION_RESTORE]="RBK0302W: Partition %s wurde nicht auf %s zurückgespielt."
+MSG_PARTITION_RESTORE_NO_BOOT_POSSIBLE=304
+MSG_EN[$MSG_PARTITION_RESTORE_NO_BOOT_POSSIBLE]="RBK0303W: OS partitions not restored. System may not boot."
+MSG_DE[$MSG_PARTITION_RESTORE_NO_BOOT_POSSIBLE]="RBK0303W: OS Partitionen nicht zurückgespielt. Das System könnte nicht booten."
+MSG_RESTORING_PARTITIONS=305
+MSG_EN[$MSG_RESTORING_PARTITIONS]="RBK0305W: Restoring %s partitions to %s."
+MSG_DE[$MSG_RESTORING_PARTITIONS]="RBK0305W: %s Partitionen werden auf %s zurüchgespielt."
+MSG_ANSWER_ALL=306
+MSG_EN[$MSG_ANSWER_ALL]="all"
+MSG_DE[$MSG_ANSWER_ALL]="Alle"
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -6005,8 +6017,16 @@ function formatBackupDevice() {
 
 	elif [[ $BACKUPTYPE != $BACKUPTYPE_DD && $BACKUPTYPE != $BACKUPTYPE_DDZ ]]; then
 
-		writeToConsole $MSG_LEVEL_DETAILED $MSG_PARTITIONING_SDCARD "$RESTORE_DEVICE"
-		writeToConsole $MSG_LEVEL_DETAILED $MSG_CREATING_PARTITIONS "$RESTORE_DEVICE"
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_PARTITIONING_SDCARD "$RESTORE_DEVICE"
+
+		if ! askYesNo; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORE_ABORTED
+			exitError $RC_RESTORE_FAILED
+		fi
+
+		if (( $NO_YES_QUESTION )); then
+			echo "Y${NL}"
+		fi
 
 		if (( $FORCE_SFDISK )); then
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_FORCING_CREATING_PARTITIONS
@@ -7771,6 +7791,24 @@ function restorePartitionBasedBackup() {
 		echo "Y${NL}"
 	fi
 
+	if (( PARTITIONBASED_BACKUP )); then
+		if [[ "${PARTITIONS_TO_RESTORE}" == "$PARTITIONS_TO_BACKUP_ALL" ]]; then
+			local all="$(getMessage $MSG_ANSWER_ALL)"
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORING_PARTITIONS "$all" "$RESTORE_DEVICE"
+		else
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORING_PARTITIONS "\"$PARTITIONS_TO_RESTORE\"" "$RESTORE_DEVICE"
+		fi
+
+		if ! askYesNo; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORE_ABORTED
+			exitError $RC_RESTORE_FAILED
+		fi
+
+		if (( $NO_YES_QUESTION )); then
+			echo "Y${NL}"
+		fi
+	fi
+
 	initRestoreVariables
 	formatBackupDevice
 
@@ -7793,9 +7831,23 @@ function restorePartitionBasedBackup() {
 
 	logItem "Mount:$NL$(mount)"
 
+	local partitionBackupFile
+	local partitionsToRestore=(${PARTITIONS_TO_RESTORE[@]})
+	local partitionsRestored=()
+
 	for partitionBackupFile in "${RESTOREFILE}${BACKUP_BOOT_PARTITION_PREFIX}"*; do
-		restorePartitionBasedPartition "$partitionBackupFile"
+		local partitionNo="$(grep -Eo "[0-9]+$" <<< "$partitionBackupFile")"
+		if [[ "${PARTITIONS_TO_RESTORE}" == "$PARTITIONS_TO_BACKUP_ALL" ]] ||  containsElement "$partitionNo" "${partitionsToRestore[@]}"; then
+			restorePartitionBasedPartition "$partitionBackupFile"
+			partitionsRestored+=($partitionNo)
+		else
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_SKIP_PARTITION_RESTORE "$partitionNo" "$RESTORE_DEVICE"
+		fi
 	done
+
+	if ! containsElement "1" "${partitionsRestored[@]}" || ! containsElement "2" "${partitionsRestored[@]}"; then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_PARTITION_RESTORE_NO_BOOT_POSSIBLE 
+	fi
 
 	updateUUIDs
 
