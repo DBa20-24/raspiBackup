@@ -9640,7 +9640,7 @@ while (( "$#" )); do
 	-T)
 	  o="$(checkOptionParameter "$1" "$2")"
 	  (( $? )) && exitError $RC_PARAMETER_ERROR
-	  PARTITIONS_TO_BACKUP="$2"; shift 2
+	  PARTITIONS_TO_BACKUP="$o"; shift 2
 	  ;;
 
 	--telegramToken)
