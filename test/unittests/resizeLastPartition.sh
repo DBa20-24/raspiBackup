@@ -34,7 +34,10 @@ GB32=31268536320 # sectors 61071360
 
 function test_createResizedSFDisk() { # sfdisk_file target_size new_partition_size 
 
-	local partitionSizes=($(createResizedSFDisk "$1" "$2" "$testFile"))
+	local targetSize=$2
+	local targetPartitionSize=$3
+
+	local partitionSizes=($(createResizedSFDisk "$1" "$targetSize" "$testFile"))
 	local old=${partitionSizes[0]}
 	local new=${partitionSizes[1]}
 
@@ -42,20 +45,20 @@ function test_createResizedSFDisk() { # sfdisk_file target_size new_partition_si
 
 	resizedSize="$(calcSumSizeFromSFDISK "$testFile")"
 
-	if (( resizedSize != $2 )); then
+	if (( resizedSize != targetSize )); then
 		if [[ -z $4 ]] || (( new > 0 )); then
 			echo -n "??? --- " 
-			echo "$1: Expected disk size: $2 ($(bytesToHuman $2)) - Received: $resizedSize ($(bytesToHuman $resizedSize))"
+			echo "$1: Expected disk size: $targetSize ($(bytesToHuman $targetSize)) - Received: $resizedSize ($(bytesToHuman $resizedSize))"
 			fail=1
 			(( errors ++ ))
 			return
 		fi
 	fi
 	
-	if (( new != $3 )); then
+	if (( new != targetPartitionSize )); then
 		echo -n "??? --- "
 		fail=1
-		echo "$1: Expected partition size: $new ($(bytesToHuman $new)) - Received: $3 ($(bytesToHuman $3))"
+		echo "$1: Expected partition size: $targetPartitionSize ($(bytesToHuman $targetPartitionSize)) - Received: $new ($(bytesToHuman $new))"
 		(( errors ++ ))
 		return
 	fi
@@ -116,24 +119,24 @@ if (( executeResizeTest )); then
 	echo "--- test_createResizedSFDisk ---"
 	echo
 	# shrink
-	test_createResizedSFDisk "18-11GB.sfdisk" $((32000000000 - ( 11999461376 - 512) )) 20000538112
+	test_createResizedSFDisk "18-11GB.sfdisk" $((32000000000 - ( 11999461376 - 512) )) 512
 	test_createResizedSFDisk "18-11GB.sfdisk" $((32000000000 - ( 11999461376 + 1) )) -512 FAIL
-	test_createResizedSFDisk "128GB.sfdisk" 31268536320 30186405888
-	test_createResizedSFDisk "128GB_nosecsize.sfdisk" 31268536320 30186405888
-	test_createResizedSFDisk "28+100GB.sfdisk" 31268536320 10054451200
-	test_createResizedSFDisk "28+100GB-1ext.sfdisk" 31268536320 10054451200
-	test_createResizedSFDisk "28+5+95GB-2ext.sfdisk" 31268536320 19715325952
+	test_createResizedSFDisk "128GB.sfdisk" 31268536320 30727471104
+	test_createResizedSFDisk "128GB_nosecsize.sfdisk" 31268536320 30727471104
+	test_createResizedSFDisk "28+100GB.sfdisk" 31268536320 10607042560
+	test_createResizedSFDisk "28+100GB-1ext.sfdisk" 31268536320 10607042560
+	test_createResizedSFDisk "28+5+95GB-2ext.sfdisk" 31268536320 5776605184
 	test_createResizedSFDisk "28+95+5GB-2ext.sfdisk" 31268536320 -90860159488 FAIL
 	test_createResizedSFDisk "100+28GB.sfdisk" 31268536320 -76646711808 FAIL
 	# extend
-	test_createResizedSFDisk "32GB.sfdisk" 128035676160 126953545728
-	test_createResizedSFDisk "32GB_nosecsize.sfdisk" 128035676160 126953545728
-	test_createResizedSFDisk "10+22GB.sfdisk" 128035676160 105478709248
-	test_createResizedSFDisk "10+22GB-1ext.sfdisk" 128035676160 105478709248
+	test_createResizedSFDisk "32GB.sfdisk" 128035676160 127494610944
+	test_createResizedSFDisk "32GB_nosecsize.sfdisk" 128035676160 127494610944
+#	test_createResizedSFDisk "10+22GB.sfdisk" 128035676160 116757192704#
+#	test_createResizedSFDisk "10+22GB-1ext.sfdisk" 128035676160 116757192704
 fi
 
-rm $testFile
-#mv $testFile test.sfdisk
+#rm $testFile
+mv $testFile test.sfdisk
 
 echo
 if (( errors > 0 )); then

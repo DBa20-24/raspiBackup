@@ -4119,6 +4119,10 @@ function calcSumSizeFromSFDISK() { # sfdisk file name
 			local start=${BASH_REMATCH[2]}
 			local size=${BASH_REMATCH[3]}
 			local id=${BASH_REMATCH[4]}
+			local end
+			(( end = start + size ))
+
+			logItem "Processing $p - Start: $start - Size: $((size*512)) - End: $end - id: $id"
 
 			if [[ $id != 83 && $id != 5 && $id != c ]]; then
 				continue
@@ -4187,8 +4191,10 @@ function createResizedSFDisk() { # sfdisk_source_filename targetDeviceSize sfdis
 			local start=${BASH_REMATCH[2]}
 			local size=${BASH_REMATCH[3]}
 			local id=${BASH_REMATCH[4]}
+			local end
+			(( end = start + size ))
 
-			logItem "Processing $p - Start: $start - Size: $((size*512)) - id: $id"
+			logItem "Processing $p - Start: $start - Size: $((size*512)) - End: $end - id: $id"
 
 			if [[ $id == 5 ]]; then
 				logItem "Extended partition detected"
@@ -4250,13 +4256,13 @@ function createResizedSFDisk() { # sfdisk_source_filename targetDeviceSize sfdis
 
 	if (( newSize > 0 )); then
 		logItem "Update partition sectorsize to $newSize"
-		sed -E -i "s/(p$p :.+size=)([ 0-9]+)/\1${newSize}/" $targetFile
+		sed -E -i "s/(p$p :.+size=[ ]*)([0-9]+)/\1${newSize}/" $targetFile
 		if [[ -n $p5 ]]; then
 			local newP5Size
-			# logItem "(( newP5Size = $size5 + $diffSize ))"
+			[[ -v RESIZE_FSDISK ]] && logItem "(( newP5Size = $size5 + $diffSize ))"
 			(( newP5Size = size5 + diffSize ))
 			logItem "Update extended partition sectorsize to $newP5Size"
-			sed -E -i "s/(p$p5 :.+size=)([ 0-9]+)/\1 ${newP5Size}/" $targetFile
+			sed -E -i "s/(p$p5 :.+size=[ ]*)([0-9]+)/\1${newP5Size}/" $targetFile
 		fi
 		logCommand "cat $targetFile"
 	fi
