@@ -431,6 +431,7 @@ RC_EXTENSION_ERROR=141
 RC_UNPROTECTED_CONFIG=142
 RC_NOT_SUPPORTED=143
 RC_TEMPMOVE_FAILED=144
+RC_RESIZE_ERROR=145
 
 tty -s
 INTERACTIVE=$((!$?))
@@ -1139,11 +1140,11 @@ MSG_EN[$MSG_MISSING_INSTALLED_FILE]="RBK0131E: Program %s not found. Use 'sudo a
 MSG_DE[$MSG_MISSING_INSTALLED_FILE]="RBK0131E: Programm %s nicht gefunden. Mit 'sudo apt-get update; sudo apt-get install %s' wird das fehlende Programm installiert."
 MSG_FI[$MSG_MISSING_INSTALLED_FILE]="RBK0131E: Sovellusta %s ei löytynyt. Suorita 'sudo apt-get update; sudo apt-get install %s' asentaaksesi puuttuvan sovelluksen."
 MSG_FR[$MSG_MISSING_INSTALLED_FILE]="RBK0131E: Programme %s introuvable. Utilisez 'sudo apt-get update ; sudo apt-get install %s' pour installer le programme manquant."
-MSG_SKIPPING_CREATING_PARTITIONS=132
-MSG_EN[$MSG_SKIPPING_CREATING_PARTITIONS]="RBK0132W: No partitions are created. Reusing existing partitions."
-MSG_DE[$MSG_SKIPPING_CREATING_PARTITIONS]="RBK0132W: Es werden keine Partitionen erstellt sondern die existierenden Partitionen benutzt."
-MSG_FI[$MSG_SKIPPING_CREATING_PARTITIONS]="RBK0132W: Osioita ei luotu. Käytetään olemassaolevia osioita."
-MSG_FR[$MSG_SKIPPING_CREATING_PARTITIONS]="RBK0132W: Aucune partition n'est créée. Réutiliser des partitions existantes."
+#MSG_SKIPPING_CREATING_PARTITIONS=132
+#MSG_EN[$MSG_SKIPPING_CREATING_PARTITIONS]="RBK0132W: No partitions are created. Reusing existing partitions."
+#MSG_DE[$MSG_SKIPPING_CREATING_PARTITIONS]="RBK0132W: Es werden keine Partitionen erstellt sondern die existierenden Partitionen benutzt."
+#MSG_FI[$MSG_SKIPPING_CREATING_PARTITIONS]="RBK0132W: Osioita ei luotu. Käytetään olemassaolevia osioita."
+#MSG_FR[$MSG_SKIPPING_CREATING_PARTITIONS]="RBK0132W: Aucune partition n'est créée. Réutiliser des partitions existantes."
 MSG_HARDLINK_DIRECTORY_USED=133
 MSG_EN[$MSG_HARDLINK_DIRECTORY_USED]="RBK0133I: Using directory %s for hardlinks."
 MSG_DE[$MSG_HARDLINK_DIRECTORY_USED]="RBK0133I: Verzeichnis %s wird für Hardlinks benutzt."
@@ -1279,16 +1280,16 @@ MSG_EN[$MSG_BACKUPS_KEPT]="RBK0159I: %s backups kept for %s backup type. Please 
 MSG_DE[$MSG_BACKUPS_KEPT]="RBK0159I: %s Backups werden für den Backuptyp %s aufbewahrt. Bitte Geduld."
 MSG_FI[$MSG_BACKUPS_KEPT]="RBK0159I: %s varmuuskopiota pidetään %s-varmuuskopiotyypille. Ole hyvä ja odota."
 MSG_FR[$MSG_BACKUPS_KEPT]="RBK0159I: %s sauvegardes sont conservées pour le type de sauvegarde %s SVP patientez."
-MSG_TARGETSD_SIZE_TOO_SMALL=160
-MSG_EN[$MSG_TARGETSD_SIZE_TOO_SMALL]="RBK0160E: Target %s with %s is smaller than backup source with %s."
-MSG_DE[$MSG_TARGETSD_SIZE_TOO_SMALL]="RBK0160E: Ziel %s mit %s ist kleiner als die Backupquelle mit %s."
-MSG_FI[$MSG_TARGETSD_SIZE_TOO_SMALL]="RBK0160E: Kohde %s koollaan %s on pienempi kuin varmuuskopion lähde kooltaan %s."
-MSG_FR[$MSG_TARGETSD_SIZE_TOO_SMALL]="RBK0160E: La cible %s avec %s est plus petite que la source de sauvegarde avec %s."
-MSG_TARGETSD_SIZE_BIGGER=161
-MSG_EN[$MSG_TARGETSD_SIZE_BIGGER]="RBK0161W: Target %s with %s is larger than backup source with %s. You waste %s."
-MSG_DE[$MSG_TARGETSD_SIZE_BIGGER]="RBK0161W: Ziel %s mit %s ist größer als die Backupquelle mit %s. %s sind ungenutzt."
-MSG_FI[$MSG_TARGETSD_SIZE_BIGGER]="RBK0161W: Kohde %s koollaan %s on suurempi kuin varmuuskopion lähde kooltaan %s. %s jää hyödyntämättä."
-MSG_FR[$MSG_TARGETSD_SIZE_BIGGER]="RBK0161W: La cible %s avec %s est plus grande que la source de sauvegarde avec %s. %s sont inutilisés."
+#MSG_TARGETSD_SIZE_TOO_SMALL=160
+#MSG_EN[$MSG_TARGETSD_SIZE_TOO_SMALL]="RBK0160E: Target %s with %s is smaller than backup source with %s."
+#MSG_DE[$MSG_TARGETSD_SIZE_TOO_SMALL]="RBK0160E: Ziel %s mit %s ist kleiner als die Backupquelle mit %s."
+#MSG_FI[$MSG_TARGETSD_SIZE_TOO_SMALL]="RBK0160E: Kohde %s koollaan %s on pienempi kuin varmuuskopion lähde kooltaan %s."
+#MSG_FR[$MSG_TARGETSD_SIZE_TOO_SMALL]="RBK0160E: La cible %s avec %s est plus petite que la source de sauvegarde avec %s."
+#MSG_TARGETSD_SIZE_BIGGER=161
+#MSG_EN[$MSG_TARGETSD_SIZE_BIGGER]="RBK0161W: Target %s with %s is larger than backup source with %s. You waste %s."
+#MSG_DE[$MSG_TARGETSD_SIZE_BIGGER]="RBK0161W: Ziel %s mit %s ist größer als die Backupquelle mit %s. %s sind ungenutzt."
+#MSG_FI[$MSG_TARGETSD_SIZE_BIGGER]="RBK0161W: Kohde %s koollaan %s on suurempi kuin varmuuskopion lähde kooltaan %s. %s jää hyödyntämättä."
+#MSG_FR[$MSG_TARGETSD_SIZE_BIGGER]="RBK0161W: La cible %s avec %s est plus grande que la source de sauvegarde avec %s. %s sont inutilisés."
 MSG_RESTORE_ABORTED=162
 MSG_EN[$MSG_RESTORE_ABORTED]="RBK0162I: Restore aborted."
 MSG_DE[$MSG_RESTORE_ABORTED]="RBK0162I: Restore abgebrochen."
@@ -1951,6 +1952,12 @@ MSG_DE[$MSG_MOVE_TEMP_DIR]="RBK0299I: Backupverzeichnis %1 erstellt."
 MSG_ADJUSTING_LAST=300
 MSG_EN[$MSG_ADJUSTING_LAST]="RBK0300I: Adjusting last partition from %s to %s."
 MSG_DE[$MSG_ADJUSTING_LAST]="RBK0300I: Letzte Partition wird von %s auf %s angepasst."
+MSG_TEMPMOVE_FAILED=301
+MSG_EN[$MSG_TEMPMOVE_FAILED]="RBK0301E: Move of temporary backup directory failed with RC %s."
+MSG_DE[$MSG_TEMPMOVE_FAILED]="RBK0301E: Move des temporären Backupverzeichnisses fehlerhaft beendet mit RC %s."
+MSG_RESIZED_PARTITION_TOO_SMALL=302
+MSG_EN[$MSG_RESIZED_PARTITION_TOO_SMALL]="RBK0302E: Partition %s on %s with %s is too small. Missing at least %s."
+MSG_DE[$MSG_RESIZED_PARTITION_TOO_SMALL]="RBK0302E: Zu resizende Partition %s auf %s mit %s is zu klein. Es fehlen mindestens %s"
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -3172,7 +3179,7 @@ function downloadPropertiesFile() { # FORCE
 			local func="B"; (( $RESTORE )) && func="R"
 			local srOptions="$(urlencode "$SMART_RECYCLE_OPTIONS")"
 			local srs=""; [[ -n $SMART_RECYCLE_DRYRUN ]] && (( ! $SMART_RECYCLE_DRYRUN )) && srs="$srOptions"
-			local os="rsp"; [[ -n $IS_UBUNTU ]] && os="ubu"
+			local os="rsp"; (( $IS_UBUNTU )) && os="ubu"
 			local downloadURL="${PROPERTIES_DOWNLOAD_URL}?version=$VERSION&type=$type&mode=$mode&keep=$keep&func=$func&srs=$srs&os=$os"
 		else
 			local downloadURL="$PROPERTIES_DOWNLOAD_URL"
@@ -4069,13 +4076,7 @@ function deployMyself() {
 
 }
 
-## partition table of /dev/sdc
-#unit: sectors
-
-#/dev/sdc1 : start=     8192, size=   114688, Id= c
-#/dev/sdc2 : start=   122880, size= 30244864, Id=83
-#/dev/sdc3 : start=        0, size=        0, Id= 0
-#/dev/sdc4 : start=        0, size=        0, Id= 0
+# calculate last used sector
 
 function calcSumSizeFromSFDISK() { # sfdisk file name
 
@@ -4088,15 +4089,13 @@ function calcSumSizeFromSFDISK() { # sfdisk file name
 # /dev/sdb1 : start=          63, size=  1953520002, type=83
 
 	local partitionregex="/dev/.*[p]?([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9a-z]*([0-9a-z]+)"
-	local sumSize=0
-	local sectorSize
+	local sectorSize=512 # default
 
-	logCommand "cat $file"
+	[[ -v RESIZE_FSDISK ]] && logCommand "cat $file"
 
-	sectorSize=$(grep "^sector-size:" $file)
-	if (( $? )); then
-		sectorSize=512	# not set in buster and earlier, use default
-	else
+	local sectorSize=512 # default
+
+	if grep -q "^sector-size:" $file; then
 		sectorSize=$(cut -f 2 -d ' ' <<< "$sectorSize")
 		if [[ -z $sectorSize ]]; then
 			assertionFailed $LINENO "Unable to retrieve sectorsize"
@@ -4104,59 +4103,16 @@ function calcSumSizeFromSFDISK() { # sfdisk file name
 	fi
 
 	local line
-	line="$(tail -1 $file)"
-	if [[ $line =~ $partitionregex ]]; then
-		local p=${BASH_REMATCH[1]}
-		local start=${BASH_REMATCH[2]}
-		local size=${BASH_REMATCH[3]}
-		local id=${BASH_REMATCH[4]}
+	local lineNo=0
+	local sumSize=0
 
-		if (( $id != 83 )); then
-			assertionFailed $LINENO "Last partition is no Linux partition"
+	while IFS="" read line; do
+
+		(( lineNo++ ))
+
+		if [[ -z $line || $line =~ ^[^#]*# ]]; then
+			continue
 		fi
-
-		(( sumSize = ( start + size) * sectorSize ))
-		echo "$sumSize"
-	else
-		assertionFailed $LINENO "No matching last partition found"
-	fi
-
-	logExit "$sumSize"
-}
-
-function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_target_filename -> oldPartitionSize newPartitionSize
-
-	logEntry "$@"
-
-	local sourceFile="$1"
-	local targetSize="$2"
-	local targetFile="$3"
-
-	local newSize sectorSize
-	local oldPartitionSize newPartitionSize
-
-	local partitionregex="/dev/.*[p]?([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9a-z]*([0-9a-z]+)"
-
-	sectorSize=$(grep "^sector-size:" $sourceFile)
-	if (( $? )); then
-		sectorSize=512	# not set in buster and earlier, use default
-	else
-		sectorSize=$(cut -f 2 -d ' ' <<< "$sectorSize")
-		if [[ -z $sectorSize ]]; then
-			assertionFailed $LINENO "Unablt to retrieve sector size"
-		fi
-	fi
-
-	logCommand "cat $sourceFile"
-
-	local sourceSize=$(calcSumSizeFromSFDISK "$sourceFile")
-
-	cp "$sourceFile" "$targetFile"
-
-	if (( sourceSize != targetSize )); then
-
-		local line
-		line="$(tail -1 $targetFile)"
 
 		if [[ $line =~ $partitionregex ]]; then
 			local p=${BASH_REMATCH[1]}
@@ -4164,32 +4120,152 @@ function createResizedSFDisk() { # sfdisk_source_filename targetSize sfdisk_targ
 			local size=${BASH_REMATCH[3]}
 			local id=${BASH_REMATCH[4]}
 
-			if (( $id != 83 )); then
-				assertionFailed $LINENO "Last partition is no Linux partition"
+			if [[ $id != 83 && $id != 5 && $id != c ]]; then
+				continue
 			fi
 
-			(( oldPartitionSize = ( size - start ) * sectorSize ))
+			(( sumSize = (start + size) * sectorSize ))
 
-			if (( sourceSize > targetSize )); then
-				(( newSize = ( size - ( sourceSize - targetSize ) / sectorSize ) ))
-			else
-				(( newSize = ( size + ( targetSize - sourceSize ) / sectorSize ) ))
-			fi
+			[[ -v RESIZE_FSDISK ]] && logItem "$p: Start: $start - Size: $((size*512)) : $(bytesToHuman $((size*512))) - SumSize: $sumSize : $(bytesToHuman $sumSize)"
 
-			(( newPartitionSize = ( newSize - start ) * sectorSize ))
+		fi
+	done < $file
 
-			sed -i "s/${size}/${newSize}/" $targetFile
+	if (( sumSize == 0 )) || [[ $id != 83 ]]; then
+		assertionFailed $LINENO "No matching last partition found"
+	fi
 
-		else
-			assertionFailed $LINENO "Last partition is no Linux partition"
+	echo "$sumSize"
+
+	logExit "$sumSize - $(bytesToHuman $sumSize)"
+}
+
+
+# Return oldParttiionSize and newPartitionsize of modified last partition together with partition number
+# if last partition is too small to shrink the newPartitionSize == -1
+
+function createResizedSFDisk() { # sfdisk_source_filename targetDeviceSize sfdisk_target_filename -> oldPartitionSize newPartitionSize
+
+	logEntry "$@"
+
+	local sourceFile="$1"
+	local targetDeviceSize="$2"
+	local targetFile="$3"
+
+	local oldPartitionSize newPartitionSize
+
+	local partitionregex="/dev/.*[p]?([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9]*([0-9]+)[^=]+=[^0-9a-z]*([0-9a-z]+)"
+
+	local sectorSize=512
+	if grep -q "^sector-size:" $sourceFile; then
+		sectorSize=$(cut -f 2 -d ' ' <<< "$sectorSize")
+		if [[ -z $sectorSize ]]; then
+			assertionFailed $LINENO "Unable to retrieve sector size"
 		fi
 	fi
 
-	logItem "Old: $oldPartitionSize - New: $newPartitionSize"
+	logCommand "cat $sourceFile"
 
-	logCommand "cat $targetFile"
+	local sourceDeviceSize=$(calcSumSizeFromSFDISK "$sourceFile")
 
-	local ret="$oldPartitionSize $newPartitionSize"
+	cp "$sourceFile" "$targetFile"
+
+	local line newSize diffSize
+
+	logItem "sourceDeviceSize: $sourceDeviceSize ($(bytesToHuman $(($sourceDeviceSize)))) targetDeviceSize: $targetDeviceSize ($(bytesToHuman $(($targetDeviceSize))))"
+
+	while IFS="" read line; do
+
+		(( lineNo++ ))
+
+		if [[ -z $line || $line =~ ^[^#]*# ]]; then
+			continue
+		fi
+
+		if [[ $line =~ $partitionregex ]]; then
+			local p=${BASH_REMATCH[1]}
+			local start=${BASH_REMATCH[2]}
+			local size=${BASH_REMATCH[3]}
+			local id=${BASH_REMATCH[4]}
+
+			logItem "Processing $p - Start: $start - Size: $((size*512)) - id: $id"
+
+			if [[ $id == 5 ]]; then
+				logItem "Extended partition detected"
+				local p5=$p
+				local start5=$start
+				local size5=$size
+				local id5=$id
+				continue
+			fi
+
+			if [[ $id != 83 ]]; then
+				continue
+			fi
+
+			logItem "--- Processing partition $p ---"
+
+			(( oldPartitionSize = size * sectorSize ))
+
+			logItem "OldPartitionSize: $oldPartitionSize ($(bytesToHuman $oldPartitionSize)))"
+			
+			if (( sourceDeviceSize > targetDeviceSize )); then
+				[[ -v RESIZE_FSDISK ]] && logItem "newSize = ( $size - ( $sourceDeviceSize - $targetDeviceSize ) / $sectorSize )"
+				(( newSize = ( size - ( sourceDeviceSize - targetDeviceSize ) / sectorSize ) ))
+			elif (( sourceDeviceSize < targetDeviceSize )); then
+				[[ -v RESIZE_FSDISK ]] && logItem "newSize = ( $size + ( $targetDeviceSize - $sourceDeviceSize ) / $sectorSize )"
+				(( newSize = ( size + ( targetDeviceSize - sourceDeviceSize ) / sectorSize ) ))
+			else
+				[[ -v RESIZE_FSDISK ]] && logItem "newSize = $size"
+				(( newSize = size ))
+			fi
+
+			(( diffSize = newSize - size ))
+
+			logItem "NewSize: $newSize ($(bytesToHuman $((newSize*512)))) DiffSize: $diffSize ($(bytesToHuman $((diffSize*512)))"
+
+			if (( newSize > 0 )); then
+				[[ -v RESIZE_FSDISK ]] && logItem "(( newPartitionSize = ( $newSize * $sectorSize )))"
+				(( newPartitionSize = ( newSize * sectorSize )))
+			else
+				[[ -v RESIZE_FSDISK ]] && logItem "((newPartitionSize =($newSize-1) * $sectorSize ))"		# too small, adjust for 512 division truncation gap
+				(( newPartitionSize = (newSize-1) * sectorSize ))		# too small, adjust for 512 division truncation gap
+			fi
+
+			logItem "NewPartitionSize: $newPartitionSize ($(bytesToHuman $newPartitionSize)))"
+
+			logItem "$p - Start: $start - Size: $((size*512)) - id: $id"
+			logItem "- newSize: $newSize ($(bytesToHuman $(($newSize*512)))) oldPartitionSize: $(bytesToHuman $oldPartitionSize) newPartitionSize ($(bytesToHuman $newPartitionSize))"
+		fi
+
+	done < $sourceFile
+
+	if [[ -z newSize ]]; then
+		assertionFailed $LINENO "No last Linux partition found which can be resized"
+	fi
+
+	if (( newPartitionSize <= 0 )); then			# last partition too small to shrink, return missing size
+		logItem "Partition too small: Missing $(bytesToHuman $newPartitionSize)"
+	fi
+
+	if (( newSize > 0 )); then
+		logItem "Update partition sectorsize to $newSize"
+		sed -E -i "s/(p$p :.+size=)([ 0-9]+)/\1${newSize}/" $targetFile
+		if [[ -n $p5 ]]; then
+			local newP5Size
+			# logItem "(( newP5Size = $size5 + $diffSize ))"
+			(( newP5Size = size5 + diffSize ))
+			logItem "Update extended partition sectorsize to $newP5Size"
+			sed -E -i "s/(p$p5 :.+size=)([ 0-9]+)/\1 ${newP5Size}/" $targetFile
+		fi
+		logCommand "cat $targetFile"
+	fi
+
+	logItem "Old: $oldPartitionSize ($(bytesToHuman $oldPartitionSize)) - New: $newPartitionSize $(bytesToHuman $newPartitionSize))"
+
+	local targetSize=$(calcSumSizeFromSFDISK "$targetFile")
+
+	local ret="$oldPartitionSize $newPartitionSize $p"
 
 	echo "$ret"
 
@@ -4765,6 +4841,7 @@ function masqueradeSensitiveInfoInLog() {
 
 	logItem "Masquerading some mount options"
 	sed -i -E "s/username=[^,]+\,/username=${MASQUERADE_STRING},/" $LOG_FILE # used in cifs mount options
+	sed -i -E "s/password=[^,]+\,/password=${MASQUERADE_STRING},/" $LOG_FILE
 	sed -i -E "s/domain=[^,]+\,/domain=${MASQUERADE_STRING},/" $LOG_FILE
 
 	# telegram token and chatid
@@ -4889,7 +4966,7 @@ function cleanupStartup() { # trap
 
 	if [[ $1 == "SIGINT" ]]; then
 		# ignore CTRL-C now
-		trap '' SIGINT SIGTERM EXIT
+		trap '' SIGINT SIGTERM SIGHUP
 		rc=$RC_CTRLC
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_CTRLC_DETECTED
 	fi
@@ -5635,7 +5712,7 @@ function backupTar() {
 		source="."
 		devroot="."
 		sourceDir="$TEMPORARY_MOUNTPOINT_ROOT/$partition"
-		target="\"${BACKUPTARGET_DIR}/$partition${FILE_EXTENSION[$BACKUPTYPE]}\""
+		target="${BACKUPTARGET_DIR}/$partition${FILE_EXTENSION[$BACKUPTYPE]}"
 	else
 		bootPartitionBackup
 		source="/"
@@ -5734,6 +5811,7 @@ function updatePartUUID() {
 function updateUUID() {
 	logEntry
 	if (( $UPDATE_UUIDS )); then
+		logItem "BOOT_PARTITION: $BOOT_PARTITION - ROOT_PARTITION: $ROOT_PARTITION"
 		local newUUID
 		if (( ! $SHARED_BOOT_DIRECTORY )); then
 			newUUID="$(od -A n -t x -N 4 /dev/urandom | tr -d " " | sed -r 's/(.{4})/\1-/')"
@@ -5767,7 +5845,7 @@ function backupRsync() { # partition number (for partition based backup)
 
 	if (( $PARTITIONBASED_BACKUP )); then
 		partition="${BOOT_PARTITION_PREFIX}$1"
-		target="\"${BACKUPTARGET_DIR}\""
+		target="${BACKUPTARGET_DIR}"
 		source="$TEMPORARY_MOUNTPOINT_ROOT/$partition"
 
 		lastBackupDir=$(find "$BACKUPTARGET_ROOT" -maxdepth 1 -type d -name "*-$BACKUPTYPE-*" ! -name $BACKUPFILE 2>>/dev/null | sort | tail -n 1)
@@ -5912,7 +5990,137 @@ function logSystemDiskState() {
 	logExit
 }
 
-function restore() {
+function formatBackupDevice() {
+
+	logEntry
+
+	if (( $SKIP_SFDISK )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_SKIP_CREATING_PARTITIONS
+
+	elif [[ $BACKUPTYPE != $BACKUPTYPE_DD && $BACKUPTYPE != $BACKUPTYPE_DDZ ]]; then
+
+		writeToConsole $MSG_LEVEL_DETAILED $MSG_PARTITIONING_SDCARD "$RESTORE_DEVICE"
+		writeToConsole $MSG_LEVEL_DETAILED $MSG_CREATING_PARTITIONS "$RESTORE_DEVICE"
+
+		if (( $FORCE_SFDISK )); then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_FORCING_CREATING_PARTITIONS
+			sfdisk -f "$RESTORE_DEVICE" < "$SF_FILE" &>>"$LOG_FILE"
+			rc=$?
+			if (( $rc )); then
+				if (( $rc == 1 )); then
+					local tmpSF="$(basename $SF_FILE)"
+					cp "$SF_FILE" "/tmp/$tmpSF"
+					sed -i 's/sector-size/d' "/tmp/$tmpSF"
+					sfdisk -f "$RESTORE_DEVICE" < "/tmp/$tmpSF" &>>"$LOG_FILE"
+					rc=$?
+					rm "/tmp/$tmpSF"
+				fi
+			fi
+			if (( $rc )); then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_PARTITIONS $rc "sfdisk error"
+				exitError $RC_CREATE_PARTITIONS_FAILED
+			fi
+
+			waitForPartitionDefsChanged
+
+		else
+
+			if (( ! $ROOT_PARTITION_DEFINED )) && (( $RESIZE_ROOTFS )); then
+
+				local sourceSDSize=$(calcSumSizeFromSFDISK "$SF_FILE")
+				local targetSDSize=$(blockdev --getsize64 $RESTORE_DEVICE)
+				logItem "sourceSDSize: $sourceSDSize - targetSDSize: $targetSDSize"
+
+				if (( sourceSDSize != targetSDSize )); then
+
+					if (( sourceSDSize > targetSDSize )); then
+						if (( $RESIZE_ROOTFS )); then
+							writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_WARNING "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
+						else
+							writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_DISABLED "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
+							exitError $RC_PARAMETER_ERROR
+						fi
+					else
+						if (( $RESIZE_ROOTFS )); then
+							if (( $targetSDSize >= $TWO_TB )); then		# target should have gpt in order to use space > 2TB during expansion
+								writeToConsole $MSG_LEVEL_MINIMAL $MSG_TARGET_REQUIRES_GPT "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)"
+							fi
+							writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_WARNING2 "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
+						fi
+					fi
+
+#						label: dos
+#						label-id: 0x3c3f4bdb
+#						device: /dev/mmcblk0
+#						unit: sectors
+#						sector-size: 512
+#
+#						/dev/mmcblk0p1 : start=        8192, size=      524288, type=c
+#						/dev/mmcblk0p2 : start=      532480, size=    15196160, type=83
+
+					local sourceValues=( $(awk '/[0-9] :/ { v=$4 $6; gsub(","," ",v); printf "%s",v }' "$SF_FILE") )
+					if (( ${#sourceValues[@]} < 4 )); then
+						logCommand "cat $SF_FILE"
+						assertionFailed $LINENO "Expected at least 2 partitions in $SF_FILE"
+					fi
+
+					if (( ! PARTITIONBASED_BACKUP && ( ${sourceValues[2]} == 0 || ${sourceValues[3]} == 0 ) )); then
+							writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_R_OPTION
+							exitError $RC_MISC_ERROR
+					fi
+
+					local partitionSizes
+					partitionSizes=( $(createResizedSFDisk "$SF_FILE" "$targetSDSize" "$MODIFIED_SFDISK") )
+
+					local oldPartitionSourceSize=${partitionSizes[0]}
+					local newPartitionTargetSize=${partitionSizes[1]}
+					local resizedPartitionNumber=${partitionSizes[2]}
+
+					if (( newPartitionTargetSize <= 0 )); then
+						writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESIZED_PARTITION_TOO_SMALL $resizedPartitionNumber $RESTORE_DEVICE "$(bytesToHuman $oldPartitionSourceSize)" "$(bytesToHuman -${newPartitionTargetSize})"
+						exitError $RC_RESIZE_ERROR
+					fi
+
+					if (( ${#sourceValues[@]} == 4 )); then
+						writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_SECOND "$(bytesToHuman $oldPartitionSourceSize)" "$(bytesToHuman $newPartitionTargetSize)"
+					else
+						writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_LAST "$(bytesToHuman $oldPartitionSourceSize)" "$(bytesToHuman $newPartitionTargetSize)"
+					fi
+
+				fi
+			else
+				cp "$SF_FILE" "$MODIFIED_SFDISK" # just use unmodified sfdisk when option -R is used for a hybrid system
+			fi
+
+			sfdisk -f $RESTORE_DEVICE < "$MODIFIED_SFDISK" &>>"$LOG_FILE"
+			rc=$?
+			if (( $rc )); then
+				logItem "sfdisk first attempt fails with rc $rc"
+				if (( $rc == 1 )); then								# sector-size is new in bullseye and breaks restore with older OS
+					sed -i '/sector-size/d' "$MODIFIED_SFDISK"		# remove sector-size
+					logCommand "cat $MODIFIED_SFDISK"
+					sfdisk -f $RESTORE_DEVICE < "$MODIFIED_SFDISK" &>>"$LOG_FILE"
+					rc=$?
+				fi
+			fi
+			rm $MODIFIED_SFDISK &>/dev/null
+
+			if (( $rc )); then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_PARTITIONS $rc "sfdisk error"
+				exitError $RC_CREATE_PARTITIONS_FAILED
+			fi
+
+			waitForPartitionDefsChanged
+
+		fi
+
+		logItem "Targetpartitionlayout$NL$(fdisk -l $RESTORE_DEVICE)"
+	fi
+
+	logExit
+}
+
+function restoreNormalBackupType() {
 
 	logEntry
 
@@ -5984,96 +6192,7 @@ function restore() {
 				exitError $RC_MISC_ERROR
 			fi
 
-			if (( $FORCE_SFDISK )); then
-				writeToConsole $MSG_LEVEL_MINIMAL $MSG_FORCING_CREATING_PARTITIONS
-				sfdisk -f "$RESTORE_DEVICE" < "$SF_FILE" &>>"$LOG_FILE"
-				rc=$?
-				if (( $rc )); then
-					if (( $rc == 1 )); then
-						local tmpSF="$(basename $SF_FILE)"
-						cp "$SF_FILE" "/tmp/$tmpSF"
-						sed -i 's/sector-size/d' "/tmp/$tmpSF"
-						sfdisk -f "$RESTORE_DEVICE" < "/tmp/$tmpSF" &>>"$LOG_FILE"
-						rc=$?
-						rm "/tmp/$tmpSF"
-					fi
-				fi
-				if (( $rc )); then
-					writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_PARTITIONS $rc "sfdisk error"
-					exitError $RC_CREATE_PARTITIONS_FAILED
-				fi
-
-				waitForPartitionDefsChanged
-
-			elif (( $SKIP_SFDISK )); then
-				writeToConsole $MSG_LEVEL_MINIMAL $MSG_SKIP_CREATING_PARTITIONS
-
-			else
-				writeToConsole $MSG_LEVEL_DETAILED $MSG_CREATING_PARTITIONS "$RESTORE_DEVICE"
-
-				if (( ! $ROOT_PARTITION_DEFINED )) && (( $RESIZE_ROOTFS )); then
-
-					local sourceSDSize=$(calcSumSizeFromSFDISK "$SF_FILE")
-					local targetSDSize=$(blockdev --getsize64 $RESTORE_DEVICE)
-					logItem "sourceSDSize: $sourceSDSize - targetSDSize: $targetSDSize"
-
-					if (( sourceSDSize != targetSDSize )); then
-
-#						label: dos
-#						label-id: 0x3c3f4bdb
-#						device: /dev/mmcblk0
-#						unit: sectors
-#						sector-size: 512
-#
-#						/dev/mmcblk0p1 : start=        8192, size=      524288, type=c
-#						/dev/mmcblk0p2 : start=      532480, size=    15196160, type=83
-
-						local sourceValues=( $(awk '/[0-9] :/ { v=$4 $6; gsub(","," ",v); printf "%s",v }' "$SF_FILE") )
-						if (( ${#sourceValues[@]} < 4 )); then
-							logCommand "cat $SF_FILE"
-							assertionFailed $LINENO "Expected at least 2 partitions in $SF_FILE"
-						fi
-
-						local partitionSizes
-						partitionSizes=( $(createResizedSFDisk "$SF_FILE" "$targetSDSize" "$MODIFIED_SFDISK") )
-
-						local oldPartitionSourceSize=${partitionSizes[0]}
-						local newPartitionTargetSize=${partitionSizes[1]}
-
-						if (( ${#sourceValues[@]} == 4 )); then
-							writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_SECOND "$(bytesToHuman $oldPartitionSourceSize)" "$(bytesToHuman $newPartitionTargetSize)"
-						else
-							writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_LAST "$(bytesToHuman $oldPartitionSourceSize)" "$(bytesToHuman $newPartitionTargetSize)"
-						fi
-
-					fi
-				else
-					cp "$SF_FILE" "$MODIFIED_SFDISK" # just use unmodified sfdisk when option -R is used for a hybrid system
-				fi
-
-				sfdisk -f $RESTORE_DEVICE < "$MODIFIED_SFDISK" &>>"$LOG_FILE"
-				rc=$?
-				if (( $rc )); then
-					logItem "sfdisk first attempt fails with rc $rc"
-					if (( $rc == 1 )); then								# sector-size is new in bullseye and breaks restore with older OS
-						sed -i '/sector-size/d' "$MODIFIED_SFDISK"		# remove sector-size
-						logCommand "cat $MODIFIED_SFDISK"
-						sfdisk -f $RESTORE_DEVICE < "$MODIFIED_SFDISK" &>>"$LOG_FILE"
-						rc=$?
-					fi
-				fi
-				rm $MODIFIED_SFDISK &>/dev/null
-
-				if (( $rc )); then
-					writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_PARTITIONS $rc "sfdisk error"
-					exitError $RC_CREATE_PARTITIONS_FAILED
-				fi
-
-				waitForPartitionDefsChanged
-
-			fi
-
-			logItem "Targetpartitionlayout$NL$(fdisk -l $RESTORE_DEVICE)"
+			formatBackupDevice
 
 			if [[ -e $TAR_FILE ]]; then
 				writeToConsole $MSG_LEVEL_DETAILED $MSG_FORMATTING_FIRST_PARTITION "$BOOT_PARTITION"
@@ -7372,6 +7491,15 @@ function doitBackup() {
 
 }
 
+function listDeviceInfo() { # device (/dev/sda)
+
+	logEntry "$1"
+#	local result="$(IFS='' lsblk $1 -T -o NAME,SIZE,PARTTYPE,LABEL,UUID,PARTUUID)"
+	local result="$(IFS='' lsblk $1 -T -o NAME,SIZE,PARTTYPE,LABEL)"
+	echo "$result"
+	logExit
+}
+
 function getPartitionTable() { # device
 
 	logEntry "$1"
@@ -7489,7 +7617,7 @@ function findNonpartitionBackupBootAndRootpartitionFiles() {
 
 }
 
-function restoreNonPartitionBasedBackup() {
+function initRestoreVariables () {
 
 	logEntry
 
@@ -7522,37 +7650,42 @@ function restoreNonPartitionBasedBackup() {
 
 	logItem "ROOT_PARTITION : $ROOT_PARTITION"
 
+	logExit
+}
+
+function restoreNonPartitionBasedBackup() {
+
+	logEntry
+
+	initRestoreVariables
+
 	if (( ! $SKIP_SFDISK )); then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_REPARTITION_WARNING $RESTORE_DEVICE
 	else
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_SKIP_CREATING_PARTITIONS
 	fi
 
-	current_partition_table="$(getPartitionTable $RESTORE_DEVICE)"
-	if [[ -n "$current_partition_table" ]]; then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$RESTORE_DEVICE"
-		echo "$current_partition_table"
-	else
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_PARTITION_TABLE_DEFINED "$RESTORE_DEVICE"
-		if (( $SKIP_SFDISK )); then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_MISSING_PARTITION "$RESTORE_DEVICE"
-			exitError $RC_MISSING_PARTITION
-		fi
-	fi
-
 	if (( ! $ROOT_PARTITION_DEFINED )); then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_WARN_RESTORE_DEVICE_OVERWRITTEN $RESTORE_DEVICE
+		current_partition_table="$(listDeviceInfo $RESTORE_DEVICE)"
+		if [[ -n $current_partition_table ]]; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$RESTORE_DEVICE"
+			echo "$current_partition_table"
+		else
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_PARTITION_TABLE_DEFINED "$RESTORE_DEVICE"
+		fi
 	else
-		if [[ $ROOT_DEVICE =~ /dev/mmcblk0 || $ROOT_DEVICE =~ "/dev/loop" || $ROOT_DEVICE =~ /dev/nvme0n1 ]]; then
+		if [[ $ROOT_DEVICE =~ /dev/mmcblk0 || $ROOT_DEVICE =~ "/dev/loop" || $ROOT_DEVICE =~ /dev/nvme[0-9]n[0-9] ]]; then
 			ROOT_DEVICE=$(sed -E 's/p[0-9]+$//' <<< $ROOT_PARTITION)
 		else
 			ROOT_DEVICE=$(sed -E 's/[0-9]+$//' <<< $ROOT_PARTITION)
 		fi
 
 		if [[ $ROOT_DEVICE != $RESTORE_DEVICE ]]; then
-			current_partition_table="$(getPartitionTable $ROOT_DEVICE)"
+			current_partition_table="$(listDeviceInfo $ROOT_DEVICE)"
 			if [[ -n $current_partition_table ]]; then
-				writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$ROOT_DEVICE" "$current_partition_table"
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$ROOT_DEVICE"
+				echo "$current_partition_table"
 			else
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_PARTITION_TABLE_DEFINED "$ROOT_DEVICE"
 				if (( $SKIP_SFDISK )); then
@@ -7572,7 +7705,7 @@ function restoreNonPartitionBasedBackup() {
 		exitError $RC_RESTORE_FAILED
 	fi
 
-	restore
+	restoreNormalBackupType
 
 	logExit "$rc"
 
@@ -7618,8 +7751,9 @@ function restorePartitionBasedBackup() {
 		logItem "$(mount | grep $RESTORE_DEVICE)"
 	fi
 
-	current_partition_table="$(getPartitionTable $RESTORE_DEVICE)"
-	writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$RESTORE_DEVICE" "$current_partition_table"
+	current_partition_table="$(listDeviceInfo $RESTORE_DEVICE)"
+	writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$RESTORE_DEVICE"
+	echo "$current_partition_table"
 	writeToConsole $MSG_LEVEL_MINIMAL $MSG_WARN_RESTORE_PARTITION_DEVICE_OVERWRITTEN "$RESTORE_DEVICE"
 
 	if ! askYesNo; then
@@ -7631,38 +7765,8 @@ function restorePartitionBasedBackup() {
 		echo "Y${NL}"
 	fi
 
-	if (( ! $SKIP_SFDISK )); then
-		writeToConsole $MSG_LEVEL_DETAILED $MSG_PARTITIONING_SDCARD "$RESTORE_DEVICE"
-		writeToConsole $MSG_LEVEL_DETAILED $MSG_CREATING_PARTITIONS "$RESTORE_DEVICE"
-
-		local force=""
-		if (( $FORCE_SFDISK )); then
-			force="--force"
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_FORCING_CREATING_PARTITIONS
-		fi
-
-		sfdisk $force -f "$RESTORE_DEVICE" < "$SF_FILE" &>>"$LOG_FILE"
-		rc=$?
-		if (( $rc )); then
-			if (( $rc == 1 )); then
-				local tmpSF="$(basename $SF_FILE)"
-				cp "$SF_FILE" "/tmp/$tmpSF"
-				sed -i 's/sector-size/d' "/tmp/$tmpSF"
-				sfdisk -f "$RESTORE_DEVICE" < "/tmp/$tmpSF" &>>"$LOG_FILE"
-				rc=$?
-				rm "/tmp/$tmpSF"
-			fi
-		fi
-		if (( $rc )); then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNABLE_TO_CREATE_PARTITIONS $rc "sfdisk error"
-			exitError $RC_CREATE_PARTITIONS_FAILED
-		fi
-
-		waitForPartitionDefsChanged
-
-	else 
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_SKIP_CREATING_PARTITIONS
-	fi
+	initRestoreVariables
+	formatBackupDevice
 
 	if [[ "${RESTOREFILE: -1}" != "/" ]]; then
 		RESTOREFILE="$RESTOREFILE/"
@@ -7707,7 +7811,8 @@ function getBackupPartitionLabel() { # partition
 	logEntry "$1"
 
 	local partition=$1
-	local blkid label
+	local blkid
+	local label=""
 
 	blkid=$(grep $partition "$BLKID_FILE")
 	logItem "BLKID: $1 - $blkid"
@@ -7716,8 +7821,8 @@ function getBackupPartitionLabel() { # partition
 
 	if [[ $blkid =~ $regexFormatLineLabel ]]; then
 		label=${BASH_REMATCH[1]}
-	else
-		label=$(sed -E 's/\/dev\///' <<< $partition)	# strip /dev/
+#	else
+#		label=$(sed -E 's/\/dev\///' <<< $partition)	# strip /dev/
 	fi
 
 	echo "$label"
@@ -8027,7 +8132,7 @@ function restorePartitionBasedPartition() { # restorefile
 				fi
 			fi
 
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORING_FILE_PARTITION_DONE "$mappedRestorePartition"
+			writeToConsole $MSG_LEVEL_DETAILED $MSG_RESTORING_FILE_PARTITION_DONE "$mappedRestorePartition"
 
 		else
 			logItem "Skipping to label and restore partition $mappedRestorePartition"
@@ -8084,11 +8189,9 @@ function doitRestore() {
 		exitError $RC_MISSING_FILES
 	fi
 
-	if (( ! $SKIP_SFDISK )); then
-		if isMounted "$RESTORE_DEVICE"; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORE_DEVICE_MOUNTED "$RESTORE_DEVICE"
-			exitError $RC_MISC_ERROR
-		fi
+	if isMounted "$RESTORE_DEVICE"; then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORE_DEVICE_MOUNTED "$RESTORE_DEVICE"
+		exitError $RC_MISC_ERROR
 	fi
 
 	logItem "Checking for partitionbasedbackup in $RESTOREFILE/*"
@@ -8221,35 +8324,6 @@ function doitRestore() {
 	#		exitError $RC_RESTORE_FAILED
 	#	fi
 	#fi
-
-	# adjust partition for tar and rsync backup in normal mode
-
-	if (( [[ $BACKUPTYPE != $BACKUPTYPE_DD && $BACKUPTYPE != $BACKUPTYPE_DDZ ]] && (( ! $ROOT_PARTITION_DEFINED )); then
-
-		local sourceSDSize=$(calcSumSizeFromSFDISK "$SF_FILE")
-		local targetSDSize=$(blockdev --getsize64 $RESTORE_DEVICE)
-		logItem "soureSDSize: $sourceSDSize - targetSDSize: $targetSDSize"
-
-		if (( ! $FORCE_SFDISK && ! $SKIP_SFDISK )); then
-			if (( sourceSDSize != targetSDSize )); then
-				if (( sourceSDSize > targetSDSize )); then
-					if (( $RESIZE_ROOTFS )); then
-						writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_WARNING "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
-					else
-						writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_DISABLED "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
-						exitError $RC_PARAMETER_ERROR
-					fi
-				else
-					if (( $RESIZE_ROOTFS )); then
-						if (( $targetSDSize >= $TWO_TB )); then		# target should have gpt in order to use space > 2TB during expansion
-							writeToConsole $MSG_LEVEL_MINIMAL $MSG_TARGET_REQUIRES_GPT "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)"
-						fi
-						writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_WARNING2 "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
-					fi
-				fi
-			fi
-		fi
-	fi
 
 	rc=0
 
@@ -9567,9 +9641,9 @@ while (( "$#" )); do
 	  ;;
 
 	-T)
-	  checkOptionParameter "$1" "$2"
+	  o="$(checkOptionParameter "$1" "$2")"
 	  (( $? )) && exitError $RC_PARAMETER_ERROR
-	  PARTITIONS_TO_BACKUP="$2"; shift 2
+	  PARTITIONS_TO_BACKUP="$o"; shift 2
 	  PARTITIONS_TO_RESTORE=$PARTITIONS_TO_BACKUP
 	  ;;
 
