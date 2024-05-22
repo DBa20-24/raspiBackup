@@ -4181,10 +4181,11 @@ function createResizedSFDisk() { # sfdisk_source_filename targetDeviceSize sfdis
 			local size=${BASH_REMATCH[3]}
 			local id=${BASH_REMATCH[4]}
 
-			logItem "$p - Start: $start - Size: $((size*512)) - id: $id"
+			logItem "Processing $p - Start: $start - Size: $((size*512)) - id: $id"
 
-			if [[ $id == 5 ]]; then	
-				local p5==$p
+			if [[ $id == 5 ]]; then
+				logItem "Extended partition detected"
+				local p5=$p
 				local start5=$start
 				local size5=$size
 				local id5=$id
@@ -4200,15 +4201,15 @@ function createResizedSFDisk() { # sfdisk_source_filename targetDeviceSize sfdis
 			(( oldPartitionSize = size * sectorSize ))
 
 			logItem "OldPartitionSize: $oldPartitionSize ($(bytesToHuman $oldPartitionSize)))"
-
+			
 			if (( sourceDeviceSize > targetDeviceSize )); then
-				logItem "newSize = ( $size - ( $sourceDeviceSize - $targetDeviceSize ) / $sectorSize )"
+				# logItem "newSize = ( $size - ( $sourceDeviceSize - $targetDeviceSize ) / $sectorSize )"
 				(( newSize = ( size - ( sourceDeviceSize - targetDeviceSize ) / sectorSize ) ))
 			elif (( sourceDeviceSize < targetDeviceSize )); then
-				logItem "newSize = ( $size + ( $targetDeviceSize - $sourceDeviceSize ) / $sectorSize )"
+				# logItem "newSize = ( $size + ( $targetDeviceSize - $sourceDeviceSize ) / $sectorSize )"
 				(( newSize = ( size + ( targetDeviceSize - sourceDeviceSize ) / sectorSize ) ))
 			else
-				logItem "newSize = $size"
+				#logItem "newSize = $size"
 				(( newSize = size ))
 			fi
 
@@ -4217,10 +4218,10 @@ function createResizedSFDisk() { # sfdisk_source_filename targetDeviceSize sfdis
 			logItem "NewSize: $newSize ($(bytesToHuman $((newSize*512)))) DiffSize: $diffSize ($(bytesToHuman $((diffSize*512)))"
 
 			if (( newSize > 0 )); then
-				logItem "(( newPartitionSize = ( $newSize * $sectorSize )))"
+				# logItem "(( newPartitionSize = ( $newSize * $sectorSize )))"
 				(( newPartitionSize = ( newSize * sectorSize )))
 			else
-				logItem "((newPartitionSize =($newSize-1) * $sectorSize ))"		# too small, adjust for 512 division truncation gap
+				# logItem "((newPartitionSize =($newSize-1) * $sectorSize ))"		# too small, adjust for 512 division truncation gap
 				(( newPartitionSize = (newSize-1) * sectorSize ))		# too small, adjust for 512 division truncation gap
 			fi
 
@@ -4241,14 +4242,18 @@ function createResizedSFDisk() { # sfdisk_source_filename targetDeviceSize sfdis
 	fi
 
 	if (( newSize > 0 )); then
+		logItem "Update partition sectorsize to $newSize"
 #		sed -E 's/(p1 :.+size=.+)1048576/\14711/'
-#		sed -E -E -i "s/(p$p :.+size=.+)${size}/\1${newSize}/" $targetFile
-		sed -E -i "s/${size}/${newSize}/" $targetFile
+#		sed -E -E -i "s/(p${p} :.+size=.+)${size}/\1 ${newSize}/" $targetFile
+		sed -E -i "s/(p$p :.+size=)([ 0-9]+)/\1${newSize}/" $targetFile
+#		sed -E -i "s/${size}/${newSize}/" $targetFile
 		if [[ -n $p5 ]]; then
 			local newP5Size
 			logItem "(( newP5Size = $size5 + $diffSize ))"
 			(( newP5Size = size5 + diffSize ))
-			sed -i "s/${size5}/${newP5Size}/" $targetFile
+			logItem "Update extended partition sectorsize to $newP5Size"
+			# sed -i "s/${size5}/${newP5Size}/" $targetFile
+			sed -E -i "s/(p$p5 :.+size=)([ 0-9]+)/\1 ${newP5Size}/" $targetFile
 		fi
 		logCommand "cat $targetFile"
 	fi
@@ -6015,8 +6020,6 @@ function formatBackupDevice() {
 			waitForPartitionDefsChanged
 
 		else
-
-			writeToConsole $MSG_LEVEL_DETAILED $MSG_CREATING_PARTITIONS "$RESTORE_DEVICE"
 
 			if (( ! $ROOT_PARTITION_DEFINED )) && (( $RESIZE_ROOTFS )); then
 
