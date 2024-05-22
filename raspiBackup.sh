@@ -431,6 +431,7 @@ RC_EXTENSION_ERROR=141
 RC_UNPROTECTED_CONFIG=142
 RC_NOT_SUPPORTED=143
 RC_TEMPMOVE_FAILED=144
+RC_RESIZE_ERROR=145
 
 tty -s
 INTERACTIVE=$((!$?))
@@ -1279,16 +1280,16 @@ MSG_EN[$MSG_BACKUPS_KEPT]="RBK0159I: %s backups kept for %s backup type. Please 
 MSG_DE[$MSG_BACKUPS_KEPT]="RBK0159I: %s Backups werden für den Backuptyp %s aufbewahrt. Bitte Geduld."
 MSG_FI[$MSG_BACKUPS_KEPT]="RBK0159I: %s varmuuskopiota pidetään %s-varmuuskopiotyypille. Ole hyvä ja odota."
 MSG_FR[$MSG_BACKUPS_KEPT]="RBK0159I: %s sauvegardes sont conservées pour le type de sauvegarde %s SVP patientez."
-MSG_TARGETSD_SIZE_TOO_SMALL=160
-MSG_EN[$MSG_TARGETSD_SIZE_TOO_SMALL]="RBK0160E: Target %s with %s is smaller than backup source with %s."
-MSG_DE[$MSG_TARGETSD_SIZE_TOO_SMALL]="RBK0160E: Ziel %s mit %s ist kleiner als die Backupquelle mit %s."
-MSG_FI[$MSG_TARGETSD_SIZE_TOO_SMALL]="RBK0160E: Kohde %s koollaan %s on pienempi kuin varmuuskopion lähde kooltaan %s."
-MSG_FR[$MSG_TARGETSD_SIZE_TOO_SMALL]="RBK0160E: La cible %s avec %s est plus petite que la source de sauvegarde avec %s."
-MSG_TARGETSD_SIZE_BIGGER=161
-MSG_EN[$MSG_TARGETSD_SIZE_BIGGER]="RBK0161W: Target %s with %s is larger than backup source with %s. You waste %s."
-MSG_DE[$MSG_TARGETSD_SIZE_BIGGER]="RBK0161W: Ziel %s mit %s ist größer als die Backupquelle mit %s. %s sind ungenutzt."
-MSG_FI[$MSG_TARGETSD_SIZE_BIGGER]="RBK0161W: Kohde %s koollaan %s on suurempi kuin varmuuskopion lähde kooltaan %s. %s jää hyödyntämättä."
-MSG_FR[$MSG_TARGETSD_SIZE_BIGGER]="RBK0161W: La cible %s avec %s est plus grande que la source de sauvegarde avec %s. %s sont inutilisés."
+#MSG_TARGETSD_SIZE_TOO_SMALL=160
+#MSG_EN[$MSG_TARGETSD_SIZE_TOO_SMALL]="RBK0160E: Target %s with %s is smaller than backup source with %s."
+#MSG_DE[$MSG_TARGETSD_SIZE_TOO_SMALL]="RBK0160E: Ziel %s mit %s ist kleiner als die Backupquelle mit %s."
+#MSG_FI[$MSG_TARGETSD_SIZE_TOO_SMALL]="RBK0160E: Kohde %s koollaan %s on pienempi kuin varmuuskopion lähde kooltaan %s."
+#MSG_FR[$MSG_TARGETSD_SIZE_TOO_SMALL]="RBK0160E: La cible %s avec %s est plus petite que la source de sauvegarde avec %s."
+#MSG_TARGETSD_SIZE_BIGGER=161
+#MSG_EN[$MSG_TARGETSD_SIZE_BIGGER]="RBK0161W: Target %s with %s is larger than backup source with %s. You waste %s."
+#MSG_DE[$MSG_TARGETSD_SIZE_BIGGER]="RBK0161W: Ziel %s mit %s ist größer als die Backupquelle mit %s. %s sind ungenutzt."
+#MSG_FI[$MSG_TARGETSD_SIZE_BIGGER]="RBK0161W: Kohde %s koollaan %s on suurempi kuin varmuuskopion lähde kooltaan %s. %s jää hyödyntämättä."
+#MSG_FR[$MSG_TARGETSD_SIZE_BIGGER]="RBK0161W: La cible %s avec %s est plus grande que la source de sauvegarde avec %s. %s sont inutilisés."
 MSG_RESTORE_ABORTED=162
 MSG_EN[$MSG_RESTORE_ABORTED]="RBK0162I: Restore aborted."
 MSG_DE[$MSG_RESTORE_ABORTED]="RBK0162I: Restore abgebrochen."
@@ -1953,7 +1954,10 @@ MSG_EN[$MSG_ADJUSTING_LAST]="RBK0300I: Adjusting last partition from %s to %s."
 MSG_DE[$MSG_ADJUSTING_LAST]="RBK0300I: Letzte Partition wird von %s auf %s angepasst."
 MSG_TEMPMOVE_FAILED=301
 MSG_EN[$MSG_TEMPMOVE_FAILED]="RBK0301E: Move of temporary backup directory failed with RC %s."
-MSG_DE[$MSG_TEMPMOVE_FAILED]="RBK0301E: Move des tempotären Backupverzeichnisses fehlerhaft beendet mit RC %s."
+MSG_DE[$MSG_TEMPMOVE_FAILED]="RBK0301E: Move des temporären Backupverzeichnisses fehlerhaft beendet mit RC %s."
+MSG_RESIZED_PARTITION_TOO_SMALL=302
+MSG_EN[$MSG_RESIZED_PARTITION_TOO_SMALL]="RBK0302E: Partition %s on %s with %s is too small. Missing at least %s."
+MSG_DE[$MSG_RESIZED_PARTITION_TOO_SMALL]="RBK0302E: Zu resizende Partition %s auf %s mit %s is zu klein. Es fehlen mindestens %s"
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -4134,7 +4138,7 @@ function calcSumSizeFromSFDISK() { # sfdisk file name
 }
 
 
-# Return oldParttiionSize and newPartitionsize of modified last partition
+# Return oldParttiionSize and newPartitionsize of modified last partition together with partition number
 # if last partition is too small to shrink the newPartitionSize == -1
 
 function createResizedSFDisk() { # sfdisk_source_filename targetDeviceSize sfdisk_target_filename -> oldPartitionSize newPartitionSize
@@ -4203,13 +4207,13 @@ function createResizedSFDisk() { # sfdisk_source_filename targetDeviceSize sfdis
 			logItem "OldPartitionSize: $oldPartitionSize ($(bytesToHuman $oldPartitionSize)))"
 			
 			if (( sourceDeviceSize > targetDeviceSize )); then
-				# logItem "newSize = ( $size - ( $sourceDeviceSize - $targetDeviceSize ) / $sectorSize )"
+				[[ -v RESIZE_FSDISK ]] && logItem "newSize = ( $size - ( $sourceDeviceSize - $targetDeviceSize ) / $sectorSize )"
 				(( newSize = ( size - ( sourceDeviceSize - targetDeviceSize ) / sectorSize ) ))
 			elif (( sourceDeviceSize < targetDeviceSize )); then
-				# logItem "newSize = ( $size + ( $targetDeviceSize - $sourceDeviceSize ) / $sectorSize )"
+				[[ -v RESIZE_FSDISK ]] && logItem "newSize = ( $size + ( $targetDeviceSize - $sourceDeviceSize ) / $sectorSize )"
 				(( newSize = ( size + ( targetDeviceSize - sourceDeviceSize ) / sectorSize ) ))
 			else
-				#logItem "newSize = $size"
+				[[ -v RESIZE_FSDISK ]] && logItem "newSize = $size"
 				(( newSize = size ))
 			fi
 
@@ -4218,10 +4222,10 @@ function createResizedSFDisk() { # sfdisk_source_filename targetDeviceSize sfdis
 			logItem "NewSize: $newSize ($(bytesToHuman $((newSize*512)))) DiffSize: $diffSize ($(bytesToHuman $((diffSize*512)))"
 
 			if (( newSize > 0 )); then
-				# logItem "(( newPartitionSize = ( $newSize * $sectorSize )))"
+				[[ -v RESIZE_FSDISK ]] && logItem "(( newPartitionSize = ( $newSize * $sectorSize )))"
 				(( newPartitionSize = ( newSize * sectorSize )))
 			else
-				# logItem "((newPartitionSize =($newSize-1) * $sectorSize ))"		# too small, adjust for 512 division truncation gap
+				[[ -v RESIZE_FSDISK ]] && logItem "((newPartitionSize =($newSize-1) * $sectorSize ))"		# too small, adjust for 512 division truncation gap
 				(( newPartitionSize = (newSize-1) * sectorSize ))		# too small, adjust for 512 division truncation gap
 			fi
 
@@ -4243,16 +4247,12 @@ function createResizedSFDisk() { # sfdisk_source_filename targetDeviceSize sfdis
 
 	if (( newSize > 0 )); then
 		logItem "Update partition sectorsize to $newSize"
-#		sed -E 's/(p1 :.+size=.+)1048576/\14711/'
-#		sed -E -E -i "s/(p${p} :.+size=.+)${size}/\1 ${newSize}/" $targetFile
 		sed -E -i "s/(p$p :.+size=)([ 0-9]+)/\1${newSize}/" $targetFile
-#		sed -E -i "s/${size}/${newSize}/" $targetFile
 		if [[ -n $p5 ]]; then
 			local newP5Size
-			logItem "(( newP5Size = $size5 + $diffSize ))"
+			# logItem "(( newP5Size = $size5 + $diffSize ))"
 			(( newP5Size = size5 + diffSize ))
 			logItem "Update extended partition sectorsize to $newP5Size"
-			# sed -i "s/${size5}/${newP5Size}/" $targetFile
 			sed -E -i "s/(p$p5 :.+size=)([ 0-9]+)/\1 ${newP5Size}/" $targetFile
 		fi
 		logCommand "cat $targetFile"
@@ -4262,7 +4262,7 @@ function createResizedSFDisk() { # sfdisk_source_filename targetDeviceSize sfdis
 
 	local targetSize=$(calcSumSizeFromSFDISK "$targetFile")
 
-	local ret="$oldPartitionSize $newPartitionSize"
+	local ret="$oldPartitionSize $newPartitionSize $p"
 
 	echo "$ret"
 
@@ -5808,6 +5808,7 @@ function updatePartUUID() {
 function updateUUID() {
 	logEntry
 	if (( $UPDATE_UUIDS )); then
+		logItem "BOOT_PARTITION: $BOOT_PARTITION - ROOT_PARTITION: $ROOT_PARTITION"
 		local newUUID
 		if (( ! $SHARED_BOOT_DIRECTORY )); then
 			newUUID="$(od -A n -t x -N 4 /dev/urandom | tr -d " " | sed -r 's/(.{4})/\1-/')"
@@ -6070,6 +6071,12 @@ function formatBackupDevice() {
 
 					local oldPartitionSourceSize=${partitionSizes[0]}
 					local newPartitionTargetSize=${partitionSizes[1]}
+					local resizedPartitionNumber=${partitionSizes[2]}
+
+					if (( newPartitionTargetSize <= 0 )); then
+						writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESIZED_PARTITION_TOO_SMALL $resizedPartitionNumber $RESTORE_DEVICE "$(bytesToHuman $oldPartitionSourceSize)" "$(bytesToHuman -${newPartitionTargetSize})"
+						exitError $RC_RESIZE_ERROR
+					fi
 
 					if (( ${#sourceValues[@]} == 4 )); then
 						writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_SECOND "$(bytesToHuman $oldPartitionSourceSize)" "$(bytesToHuman $newPartitionTargetSize)"
@@ -7484,7 +7491,8 @@ function doitBackup() {
 function listDeviceInfo() { # device (/dev/sda)
 
 	logEntry "$1"
-	local result="$(IFS='' lsblk $1 -o NAME,SIZE,FSTYPE,FSSIZE,FSUSED,FSUSE%,PARTLABEL)"
+#	local result="$(IFS='' lsblk $1 -T -o NAME,SIZE,PARTTYPE,LABEL,UUID,PARTUUID)"
+	local result="$(IFS='' lsblk $1 -T -o NAME,SIZE,PARTTYPE,LABEL)"
 	echo "$result"
 	logExit
 }
@@ -7606,7 +7614,7 @@ function findNonpartitionBackupBootAndRootpartitionFiles() {
 
 }
 
-function restoreNonPartitionBasedBackup() {
+function initRestoreVariables () {
 
 	logEntry
 
@@ -7638,6 +7646,15 @@ function restoreNonPartitionBasedBackup() {
 	fi
 
 	logItem "ROOT_PARTITION : $ROOT_PARTITION"
+
+	logExit
+}
+
+function restoreNonPartitionBasedBackup() {
+
+	logEntry
+
+	initRestoreVariables
 
 	if (( ! $SKIP_SFDISK )); then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_REPARTITION_WARNING $RESTORE_DEVICE
@@ -7745,6 +7762,7 @@ function restorePartitionBasedBackup() {
 		echo "Y${NL}"
 	fi
 
+	initRestoreVariables
 	formatBackupDevice
 
 	if [[ "${RESTOREFILE: -1}" != "/" ]]; then
@@ -7790,7 +7808,8 @@ function getBackupPartitionLabel() { # partition
 	logEntry "$1"
 
 	local partition=$1
-	local blkid label
+	local blkid
+	local label=""
 
 	blkid=$(grep $partition "$BLKID_FILE")
 	logItem "BLKID: $1 - $blkid"
@@ -7799,8 +7818,8 @@ function getBackupPartitionLabel() { # partition
 
 	if [[ $blkid =~ $regexFormatLineLabel ]]; then
 		label=${BASH_REMATCH[1]}
-	else
-		label=$(sed -E 's/\/dev\///' <<< $partition)	# strip /dev/
+#	else
+#		label=$(sed -E 's/\/dev\///' <<< $partition)	# strip /dev/
 	fi
 
 	echo "$label"
@@ -8110,7 +8129,7 @@ function restorePartitionBasedPartition() { # restorefile
 				fi
 			fi
 
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORING_FILE_PARTITION_DONE "$mappedRestorePartition"
+			writeToConsole $MSG_LEVEL_DETAILED $MSG_RESTORING_FILE_PARTITION_DONE "$mappedRestorePartition"
 
 		else
 			logItem "Skipping to label and restore partition $mappedRestorePartition"
@@ -9619,7 +9638,7 @@ while (( "$#" )); do
 	  ;;
 
 	-T)
-	  checkOptionParameter "$1" "$2"
+	  o="$(checkOptionParameter "$1" "$2")"
 	  (( $? )) && exitError $RC_PARAMETER_ERROR
 	  PARTITIONS_TO_BACKUP="$2"; shift 2
 	  ;;
