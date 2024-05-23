@@ -6726,9 +6726,7 @@ function backupMountpoints() {
 	for mountPoint in "${MOUNTPATHS_TO_BACKUP[@]}"; do
 		logItem "Processing external mountpoint $mountPoint"
 
-		set -x
 		local used="$(df -h $mountPoint | tail -n 1 | awk '{ print $3;'})"
-		set +x
 
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_PROCESSING_EXTERNAL_MOUNTPOINT "$mountPoint" "$used"
 : << 'SKIP'
