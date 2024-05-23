@@ -432,6 +432,7 @@ RC_UNPROTECTED_CONFIG=142
 RC_NOT_SUPPORTED=143
 RC_TEMPMOVE_FAILED=144
 RC_RESIZE_ERROR=145
+RC_EXTERNALMOUNT_ERROR=146
 
 tty -s
 INTERACTIVE=$((!$?))
@@ -1970,6 +1971,24 @@ MSG_DE[$MSG_RESTORING_PARTITIONS]="RBK0305W: %s Partitionen werden auf %s zurüc
 MSG_ANSWER_ALL=306
 MSG_EN[$MSG_ANSWER_ALL]="all"
 MSG_DE[$MSG_ANSWER_ALL]="Alle"
+MSG_EXTERNAL_MOUNT_NOT_MOUNTED=307
+MSG_EN[$MSG_EXTERNAL_MOUNT_NOT_MOUNTED]="RBK0307E: No partition mounted on external mountpoint '%s'."
+MSG_DE[$MSG_EXTERNAL_MOUNT_NOT_MOUNTED]="RBK0307E: Am externen mountpoint '%s' ist keine Partition gemounted."
+MSG_EXTERNAL_MOUNT_INVALID=308
+MSG_EN[$MSG_EXTERNAL_MOUNT_INVALID]="RBK0308E: Invalid external mountpoint '%s'."
+MSG_DE[$MSG_EXTERNAL_MOUNT_INVALID]="RBK0308E: Externer Mountpoint '%s' ist ungültig."
+MSG_EXTERNAL_MOUNT_NOT_FOUND=309
+MSG_EN[$MSG_EXTERNAL_MOUNT_NOT_FOUND]="RBK0309E: External mountpoint '%s' does not exist."
+MSG_DE[$MSG_EXTERNAL_MOUNT_NOT_FOUND]="RBK0309E: Externer Mountpoint '%s' existiert nicht."
+MSG_PROCESSING_EXTERNAL_MOUNTPOINT=310
+MSG_EN[$MSG_PROCESSING_EXTERNAL_MOUNTPOINT]="RBK0310I: Saving external mountpoint %s (%s) ..."
+MSG_DE[$MSG_PROCESSING_EXTERNAL_MOUNTPOINT]="RBK0310I: Externe Mountpoint%s (%s) wird gesichert ..."
+MSG_BACKUP_EXTERNAL_MOUNTPOINT_FAILED=311
+MSG_EN[$MSG_BACKUP_EXTERNAL_MOUNTPOINT_FAILED]="RBK0311E: Backup of external mointpoint %s failed with RC %s."
+MSG_DE[$MSG_BACKUP_EXTERNAL_MOUNTPOINT_FAILED]="RBK0311E: Sicherung des externen Mountpoints %s schlug fehl mit RC %s."
+MSG_PROCESSED_EXTERNAL_MOUNTPOINT=312
+MSG_EN[$MSG_PROCESSED_EXTERNAL_MOUNTPOINT]="RBK0312I: External mointpoint %s was saved."
+MSG_DE[$MSG_PROCESSED_EXTERNAL_MOUNTPOINT]="RBK0312I: Externer Mountpoint %s wurde gesichert."
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -2706,6 +2725,8 @@ function logOptions() { # option state
 	logItem "APPEND_LOG=$APPEND_LOG"
 	logItem "APPEND_LOG_OPTION=$APPEND_LOG_OPTION"
 	logItem "BACKUPPATH=$BACKUPPATH"
+	logItem "MOUNTPATHS_TO_BACKUP=$MOUNTPATHS_TO_BACKUP"
+	logItem "MOUNTPATHS_TO_RESTORE=$MOUNTPATHS_TO_RESTORE"
 	logItem "BACKUPTYPE=$BACKUPTYPE"
 	logItem "BEFORE_STOPSERVICES=$BEFORE_STOPSERVICES"
 	logItem "BOOT_DEVICE=$BOOT_DEVICE"
@@ -2869,6 +2890,9 @@ function initializeDefaultConfigVariables() {
 	# backup and restore first two partitions only
 	DEFAULT_PARTITIONS_TO_BACKUP="1 2"
 	DEFAULT_PARTITIONS_TO_RESTORE="1 2"
+	# backup and restore no external partitions
+	DEFAULT_MOUNTPATHS_TO_BACKUP=""
+	DEFAULT_MOUNTPATHS_TO_RESTORE=""
 	# language (DE or EN)
 	DEFAULT_LANGUAGE=""
 	# hosts which will get the updated backup script with parm -y - non pwd access with keys has to be enabled
@@ -2959,6 +2983,7 @@ function copyDefaultConfigVariables() {
 	BACKUPTYPE="$DEFAULT_BACKUPTYPE"
 	BOOT_DEVICE="$DEFAULT_BOOT_DEVICE"
 	AFTER_STARTSERVICES="$DEFAULT_AFTER_STARTSERVICES"
+	MOUNTPATHS_TO_BACKUP="$DEFAULT_MOUNTPATHS_TO_BACKUP"
 	BEFORE_STOPSERVICES="$DEFAULT_BEFORE_STOPSERVICES"
 	CHECK_FOR_BAD_BLOCKS="$DEFAULT_CHECK_FOR_BAD_BLOCKS"
 	COLOR_CODES=("${DEFAULT_COLOR_CODES[0]}" "${DEFAULT_COLOR_CODES[1]}")
@@ -3003,9 +3028,10 @@ function copyDefaultConfigVariables() {
 	REBOOT_SYSTEM="$DEFAULT_REBOOT_SYSTEM"
 	RESIZE_ROOTFS="$DEFAULT_RESIZE_ROOTFS"
 	RESTORE_DEVICE="$DEFAULT_RESTORE_DEVICE"
+	RESTORE_EXTENSIONS="$DEFAULT_RESTORE_EXTENSIONS"
+	MOUNTPATHS_TO_RESTORE="$DEFAULT_MOUTPATHS_TO_RESTORE"
 	RESTORE_REMINDER_INTERVAL="$DEFAULT_RESTORE_REMINDER_INTERVAL"
 	RESTORE_REMINDER_REPEAT="$DEFAULT_RESTORE_REMINDER_REPEAT"
-	RESTORE_EXTENSIONS="$DEFAULT_RESTORE_EXTENSIONS"
 	RSYNC_BACKUP_ADDITIONAL_OPTIONS="$DEFAULT_RSYNC_BACKUP_ADDITIONAL_OPTIONS"
 	RSYNC_BACKUP_OPTIONS="$DEFAULT_RSYNC_BACKUP_OPTIONS"
 	SENDER_EMAIL="$DEFAULT_SENDER_EMAIL"
@@ -6554,7 +6580,8 @@ function backup() {
 					exitError $RC_NATIVE_BACKUP_FAILED
 				fi
 			else
-				backupPartitions
+				#backupPartitions
+				backupMountpoints
 			fi
 		fi
 	fi
@@ -6681,6 +6708,54 @@ function backupPartitions() {
 	if [[ $BACKUPTYPE == $BACKUPTYPE_RSYNC || $BACKUPTYPE == $BACKUPTYPE_TAR || $BACKUPTYPE == $BACKUPTYPE_TGZ ]]; then
 		umountSDPartitions "$TEMPORARY_MOUNTPOINT_ROOT"
 	fi
+
+	logExit "$rc"
+
+}
+
+function backupMountpoints() {
+
+	logEntry
+
+	local mountpoint
+
+	logItem "MOUNTPATHS_TO_BACKUP: $(echo ${MOUNTPATHS_TO_BACKUP[@]})"
+
+	writeToConsole $MSG_LEVEL_MINIMAL $MSG_BACKUP_STARTED "$BACKUPTYPE"
+
+	for mountPoint in "${MOUNTPATHS_TO_BACKUP[@]}"; do
+		logItem "Processing external mountpoint $mountPoint"
+
+		set -x
+		local used="$(df -h $mountPoint | tail -n 1 | awk '{ print $3;'})"
+		set +x
+
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_PROCESSING_EXTERNAL_MOUNTPOINT "$mountPoint" "$used"
+: << 'SKIP'
+		case "$BACKUPTYPE" in
+
+			$BACKUPTYPE_DD|$BACKUPTYPE_DDZ) backupDD "$partition"
+				;;
+
+			$BACKUPTYPE_TAR|$BACKUPTYPE_TGZ) backupTar "$partition"
+				;;
+
+			$BACKUPTYPE_RSYNC) backupRsync "$partition"
+				;;
+
+			*) assertionFailed $LINENO "Invalid backuptype $BACKUPTYPE"
+				;;
+		esac
+SKIP
+	rc=0
+		if [[ $rc != 0 ]]; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_BACKUP_EXTERNAL_MOUNTPOINT_FAILED "$mountPoint" $rc
+			exitError $RC_NATIVE_BACKUP_FAILED
+		else
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_PROCESSED_EXTERNAL_MOUNTPOINT "$mountPoint"
+		fi
+
+	done
 
 	logExit "$rc"
 
@@ -7463,6 +7538,36 @@ function doitBackup() {
 			exitError $RC_MISC_ERROR
 		fi
 	fi
+
+	if (( $PARTITIONBASED_BACKUP )) && [[ -n $MOUNTPATHS_TO_BACKUP ]]; then
+
+		local errorFound=0
+		for mountPath in ${MOUNTPATHS_TO_BACKUP[@]}; do
+
+			if ! grep -Eq "^(/[^/ ]*)+/?$" <<< "$mountPath"; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_INVALID "$mountPath"
+				errorFound=1
+				continue
+			fi
+
+			if [[ ! -d  $mountPath ]]; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_FOUND "$mountPath"
+				errorFound=1
+				continue
+			fi			
+				
+			if ! isMounted "$mountPath"; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_MOUNTED "$mountPath"
+				errorFound=1
+				continue
+			fi
+		done
+		if (( $errorFound )); then
+			exitError $RC_EXTERNALMOUNT_ERROR
+		fi
+	fi
+
+# all tests succeeded
 
 	BACKUPPATH_PARAMETER="$BACKUPPATH"
 	BACKUPPATH="$BACKUPPATH/$HOSTNAME"
@@ -9757,6 +9862,13 @@ while (( "$#" )); do
 	  EXCLUDE_DD=$(getEnableDisableOption "$1"); shift 1
 	  ;;
 
+	-X)
+	  o="$(checkOptionParameter "$1" "$2")"
+	  (( $? )) && exitError $RC_PARAMETER_ERROR
+	  MOUNTPATHS_TO_BACKUP="$o"; shift 2
+	  MOUNTPATHS_TO_RESTORE=$MOUNTPATHS_TO_BACKUP
+	  ;;
+
 	-y|-y[-+])
 	  DEPLOY=$(getEnableDisableOption "$1"); shift 1
 	  ;;
@@ -9865,7 +9977,7 @@ if (( $UPDATE_MYSELF )); then
 	exitNormal
 fi
 
-if (( $NO_YES_QUESTION )); then				# WARNING: dangerous option !!!
+if (( $RESTORE && $NO_YES_QUESTION )); then				# WARNING: dangerous option !!!
 	if [[ ! $RESTORE_DEVICE =~ $YES_NO_RESTORE_DEVICE ]]; then	# make sure we're not killing a disk by accident
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_YES_NO_DEVICE_MISMATCH $RESTORE_DEVICE $YES_NO_RESTORE_DEVICE
 		exitError $RC_MISC_ERROR
@@ -9883,7 +9995,7 @@ logItem "RESTORE: $RESTORE - fileParameter: $fileParameter"
 if [[ -n $fileParameter ]]; then
 	if (( $RESTORE )); then
 		RESTOREFILE="$(readlink -f "$fileParameter")"
-	else
+	els
 		BACKUPPATH="$(readlink -f "$fileParameter")"
 	fi
 fi
