@@ -4805,8 +4805,6 @@ function cleanupBackupDirectory() {
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_REMOVING_BACKUP_FAILED "$BACKUPTARGET_TEMP_ROOT" "$rmrc"
 			fi
 		fi
-		logItem "Deleting $BACKUPTARGET_TEMP_ROOT"
-		rmdir "$BACKUPTARGET_TEMP_ROOT" &>> $LOG_FILE
 	fi
 
 	logExit
@@ -5745,18 +5743,30 @@ function backupDD() {
 function backupTar() {
 
 	local verbose zip cmd partition source target devroot sourceDir
+	local partitionBackup=0 mountpointName
 
 	logEntry
 
 	(( $VERBOSE )) && verbose="-v" || verbose=""
 	[[ $BACKUPTYPE == $BACKUPTYPE_TGZ ]] && zip="-z" || zip=""
 
+	[[ $1 =~ [0-9]+ ]] && partitionBackup=1
+
 	if (( $PARTITIONBASED_BACKUP )); then
-		partition="${BOOT_PARTITION_PREFIX}$1"
-		source="."
-		devroot="."
-		sourceDir="$TEMPORARY_MOUNTPOINT_ROOT/$partition"
-		target="${BACKUPTARGET_DIR}/$partition${FILE_EXTENSION[$BACKUPTYPE]}"
+		if (( partitionBackup )); then
+			partition="${BOOT_PARTITION_PREFIX}$1"
+			source="."
+			devroot="."
+			sourceDir="$TEMPORARY_MOUNTPOINT_ROOT/$partition"
+			target="${BACKUPTARGET_DIR}/$partition${FILE_EXTENSION[$BACKUPTYPE]}"
+		else
+			logItem "Mountpoint backup"
+			mountpointName="$(encodeMountpoint "$1")"
+			source="."
+			devroot="."
+			sourceDir="$1"
+			target="${BACKUPTARGET_DIR}/${mountpointName}${FILE_EXTENSION[$BACKUPTYPE]}"
+		fi
 	else
 		bootPartitionBackup
 		source="/"
@@ -5770,27 +5780,27 @@ function backupTar() {
 	local msg_file="${MSG_FILE/\//}" # remove leading /
 
 	cmd="tar \
-		$TAR_BACKUP_OPTIONS \
-		$TAR_BACKUP_ADDITIONAL_OPTIONS \
-		${zip} \
-		${verbose} \
-		-f $target \
-		--warning=no-xdev \
-		--numeric-owner \
-		--exclude=\"$BACKUPPATH_PARAMETER/*\" \
-		--exclude=\"$devroot/$log_file\" \
-		--exclude=\"$devroot/$msg_file\" \
-		--exclude='.gvfs' \
-		--exclude=$devroot/proc/* \
-		--exclude=$devroot/lost+found/* \
-		--exclude=$devroot/sys/* \
-		--exclude=$devroot/dev/* \
-		--exclude=$devroot/tmp/* \
-		--exclude=$devroot/swapfile \
-		--exclude=$devroot/run/* \
-		--exclude=$devroot/media/* \
-		$EXCLUDE_LIST \
-		$source"
+$TAR_BACKUP_OPTIONS \
+$TAR_BACKUP_ADDITIONAL_OPTIONS \
+${zip} \
+${verbose} \
+-f $target \
+--warning=no-xdev \
+--numeric-owner \
+--exclude=\"$BACKUPPATH_PARAMETER/*\" \
+--exclude=\"$devroot/$log_file\" \
+--exclude=\"$devroot/$msg_file\" \
+--exclude='.gvfs' \
+--exclude=$devroot/proc/* \
+--exclude=$devroot/lost+found/* \
+--exclude=$devroot/sys/* \
+--exclude=$devroot/dev/* \
+--exclude=$devroot/tmp/* \
+--exclude=$devroot/swapfile \
+--exclude=$devroot/run/* \
+--exclude=$devroot/media/* \
+$EXCLUDE_LIST \
+$source"
 
 	if (( $PARTITIONBASED_BACKUP )); then
 		if ! pushd $sourceDir &>>$LOG_FILE; then
@@ -5874,9 +5884,36 @@ function updateUUID() {
 	logExit
 }
 
-function backupRsync() { # partition number (for partition based backup)
+function encodeMountpoint() { # mountpoint
+
+	logEntry "$1"
+
+	local encodedMountpoint
+
+	encodeMountpoint="$(sed 's@/@_@g' <<< "$1")"
+
+	echo "$encodeMountpoint"
+
+	logExit "$encodeMountpoint"
+}
+
+function decodeMountpoint() { # encoded mountpoint
+
+	logEntry "$1"
+
+	local decodedMountpoint
+
+	decodedMountpoint="$(sed 's@_@/@g' <<< "$1")"
+
+	echo "$decodedMountpoint"
+
+	logExit "$decodedMountpoint"
+}
+
+function backupRsync() { # partition number (for partition based backup), mountpoint for mountpoint backup
 
 	local verbose partition target source excludeRoot cmd cmdParms excludeMeta
+	local partitionBackup=0 mountpointName
 
 	logEntry
 
@@ -5885,15 +5922,26 @@ function backupRsync() { # partition number (for partition based backup)
 	verbose="--info=NAME0"
 	(( $VERBOSE )) && verbose="-v"
 
+	[[ $1 =~ [0-9]+ ]] && partitionBackup=1
+
 	logCommand "ls $BACKUPTARGET_ROOT"
 
 	if (( $PARTITIONBASED_BACKUP )); then
-		partition="${BOOT_PARTITION_PREFIX}$1"
-		target="${BACKUPTARGET_DIR}"
-		source="$TEMPORARY_MOUNTPOINT_ROOT/$partition"
+		if (( partitionBackup )); then
+			logItem "Partition backup"
+			partition="${BOOT_PARTITION_PREFIX}$1"
+			target="${BACKUPTARGET_DIR}"
+			source="$TEMPORARY_MOUNTPOINT_ROOT/$partition"
+			excludeRoot="/$partition"
+		else
+			logItem "Mountpoint backup"
+			mountpointName="$(encodeMountpoint "$1")"
+			target="${BACKUPTARGET_DIR}/${mountpointName}"
+			source="$1/"
+			excludeRoot=""
+		fi
 
-		lastBackupDir=$(find "$BACKUPTARGET_ROOT" -maxdepth 1 -type d -name "*-$BACKUPTYPE-*" ! -name $BACKUPFILE 2>>/dev/null | sort | tail -n 1)
-		excludeRoot="/$partition"
+		lastBackupDir=$(find "$BACKUPTARGET_ROOT" -maxdepth 1 -type d -name "*-$BACKUPTYPE-*" ! -name $BACKUPFILE 2>>/dev/null | sort | tail -n 1)			
 
 	else
 		target="\"${BACKUPTARGET_DIR}\""
@@ -5908,7 +5956,13 @@ function backupRsync() { # partition number (for partition based backup)
 	logItem "LastBackupDir: $lastBackupDir"
 
 	LINK_DEST=""
-	[[ -n "$lastBackupDir" ]] && LINK_DEST="--link-dest=\"$lastBackupDir\""
+	if [[ -n "$lastBackupDir" ]]; then
+		if (( partitionBackup )); then
+			LINK_DEST="--link-dest=\"$lastBackupDir\""
+		elif [[ -d $lastBackupDir/$mountpointName ]]; then
+			LINK_DEST="--link-dest=\"$lastBackupDir/${mountpointName}\""
+		fi
+	fi
 
 	logItem "LinkDest: $LINK_DEST"
 
@@ -5929,27 +5983,27 @@ function backupRsync() { # partition number (for partition based backup)
 	fi
 
 	cmdParms="--exclude=\"$BACKUPPATH_PARAMETER/*\" \
-			--exclude=\"$excludeRoot/$log_file\" \
-			--exclude=\"$excludeRoot/$msg_file\" \
-			--exclude='.gvfs' \
-			--exclude=$excludeRoot/proc/* \
-			--exclude=$excludeRoot/lost+found/* \
-			--exclude=$excludeRoot/sys/* \
-			--exclude=$excludeRoot/dev/* \
-			--exclude=$excludeRoot/swapfile \
-			--exclude=$excludeRoot/tmp/* \
-			--exclude=$excludeRoot/run/* \
-			--exclude=$excludeRoot/media/* \
-			$excludeMeta \
-			$EXCLUDE_LIST \
-			$LINK_DEST \
-			--numeric-ids \
-			$RSYNC_BACKUP_OPTIONS \
-			$RSYNC_BACKUP_ADDITIONAL_OPTIONS \
-			$verbose \
-			$source \
-			$target \
-			"
+--exclude=\"$excludeRoot/$log_file\" \
+--exclude=\"$excludeRoot/$msg_file\" \
+--exclude='.gvfs' \
+--exclude=$excludeRoot/proc/* \
+--exclude=$excludeRoot/lost+found/* \
+--exclude=$excludeRoot/sys/* \
+--exclude=$excludeRoot/dev/* \
+--exclude=$excludeRoot/swapfile \
+--exclude=$excludeRoot/tmp/* \
+--exclude=$excludeRoot/run/* \
+--exclude=$excludeRoot/media/* \
+$excludeMeta \
+$EXCLUDE_LIST \
+$LINK_DEST \
+--numeric-ids \
+$RSYNC_BACKUP_OPTIONS \
+$RSYNC_BACKUP_ADDITIONAL_OPTIONS \
+$verbose \
+$source \
+$target \
+"
 
 	if (( $PROGRESS && $INTERACTIVE )); then
 		cmd="rsync --info=progress2 $cmdParms"
@@ -6556,33 +6610,31 @@ function backup() {
 
 	START_TIME=$(date +%s)
 
-	if [[ -z ${FAKE_BACKUP+x} ]]; then
-		if (( ! $FAKE )); then
-			if (( ! $PARTITIONBASED_BACKUP )); then
+	if (( ! $FAKE )); then
+		if (( ! $PARTITIONBASED_BACKUP )); then
 
-				case "$BACKUPTYPE" in
+			case "$BACKUPTYPE" in
 
-					$BACKUPTYPE_DD|$BACKUPTYPE_DDZ) backupDD
-						;;
+				$BACKUPTYPE_DD|$BACKUPTYPE_DDZ) backupDD
+					;;
 
-					$BACKUPTYPE_TAR|$BACKUPTYPE_TGZ) backupTar
-						;;
+				$BACKUPTYPE_TAR|$BACKUPTYPE_TGZ) backupTar
+					;;
 
-					$BACKUPTYPE_RSYNC) backupRsync
-						;;
+				$BACKUPTYPE_RSYNC) backupRsync
+					;;
 
-					*) assertionFailed $LINENO "Invalid backuptype $BACKUPTYPE"
-						;;
-				esac
+				*) assertionFailed $LINENO "Invalid backuptype $BACKUPTYPE"
+					;;
+			esac
 
-				if [[ $rc != 0 ]]; then
-					writeToConsole $MSG_LEVEL_MINIMAL $MSG_BACKUP_PROGRAM_ERROR $BACKUPTYPE $rc
-					exitError $RC_NATIVE_BACKUP_FAILED
-				fi
-			else
-				#backupPartitions
-				backupMountpoints
+			if [[ $rc != 0 ]]; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_BACKUP_PROGRAM_ERROR $BACKUPTYPE $rc
+				exitError $RC_NATIVE_BACKUP_FAILED
 			fi
+		else
+			backupPartitions
+			backupMountpoints
 		fi
 	fi
 	END_TIME=$(date +%s)
@@ -6620,6 +6672,25 @@ function mountSDPartitions() { # sourcePath
 			mkdir "$1/$partitionName" &>>"$LOG_FILE"
 			logItem "mount /dev/$partitionName to $1/$partitionName"
 			mountAndCheck "/dev/$partitionName" "$1/$partitionName"
+		done
+		logItem "AFTER: mount $(mount)"
+	fi
+	logExit
+}
+
+function mountMountpoints() { # sourcePath
+
+	local mountpoint mountpointName
+	logEntry
+
+	if (( ! $FAKE )); then
+		logItem "BEFORE: mount $(mount)"
+		for mountpoint in "${MOUNTPATHS_TO_BACKUP[@]}"; do
+			mountpointName="$BOOT_PARTITION_PREFIX$partition"
+			logItem "mkdir $1/$mountpointName"
+			mkdir "$1/$mountpointName" &>>"$LOG_FILE"
+			logItem "mount $mountpoint to $1/$mountpointName"
+			mountAndCheck "/dev/$partitionName" "$1/$mountpointName"
 		done
 		logItem "AFTER: mount $(mount)"
 	fi
@@ -6723,29 +6794,25 @@ function backupMountpoints() {
 
 	writeToConsole $MSG_LEVEL_MINIMAL $MSG_BACKUP_STARTED "$BACKUPTYPE"
 
-	for mountPoint in "${MOUNTPATHS_TO_BACKUP[@]}"; do
+	for mountPoint in ${MOUNTPATHS_TO_BACKUP[@]}; do
 		logItem "Processing external mountpoint $mountPoint"
 
 		local used="$(df -h $mountPoint | tail -n 1 | awk '{ print $3;'})"
 
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_PROCESSING_EXTERNAL_MOUNTPOINT "$mountPoint" "$used"
-: << 'SKIP'
+
 		case "$BACKUPTYPE" in
 
-			$BACKUPTYPE_DD|$BACKUPTYPE_DDZ) backupDD "$partition"
+			$BACKUPTYPE_TAR|$BACKUPTYPE_TGZ) backupTar "$mountPoint"
 				;;
 
-			$BACKUPTYPE_TAR|$BACKUPTYPE_TGZ) backupTar "$partition"
-				;;
-
-			$BACKUPTYPE_RSYNC) backupRsync "$partition"
+			$BACKUPTYPE_RSYNC) backupRsync "$mountPoint"
 				;;
 
 			*) assertionFailed $LINENO "Invalid backuptype $BACKUPTYPE"
 				;;
 		esac
-SKIP
-	rc=0
+
 		if [[ $rc != 0 ]]; then
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_BACKUP_EXTERNAL_MOUNTPOINT_FAILED "$mountPoint" $rc
 			exitError $RC_NATIVE_BACKUP_FAILED
@@ -7548,6 +7615,12 @@ function doitBackup() {
 				continue
 			fi
 
+			if grep -Eq "_" <<< "$mountPath"; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_INVALID "$mountPath"
+				errorFound=1
+				continue
+			fi
+
 			if [[ ! -d  $mountPath ]]; then
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_FOUND "$mountPath"
 				errorFound=1
@@ -7559,6 +7632,7 @@ function doitBackup() {
 				errorFound=1
 				continue
 			fi
+
 		done
 		if (( $errorFound )); then
 			exitError $RC_EXTERNALMOUNT_ERROR
