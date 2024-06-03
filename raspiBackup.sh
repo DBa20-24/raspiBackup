@@ -2992,17 +2992,38 @@ function copyDefaultConfigVariables() {
 
 }
 
-function bootedFromSD() {
-	logEntry
+function isSpecialBlockDevice() { # either device (mmcblk, sd) or device name (/dev/mmcblk, /dev/sd )
+
+	logEntry "$1"
+
 	local rc
-	logItem "Boot device: $BOOT_DEVICE"
-	if [[ $BOOT_DEVICE =~ mmcblk[0-9]+ ]]; then
-		rc=0			# yes /dev/mmcblk0p1
-	else
-		rc=1			# is /dev/sda1 or other
-	fi
+	
+	[[ $1 =~ mmcblk|loop|nvme ]]
+	rc=$?
+
 	logExit "$rc"
+
 	return $rc
+}
+
+function makePartition() { # either device (mmcblk0, sda) or device name (/dev/mmcblk0, /dev/sda ) and partition number (may be empty)
+
+	logEntry "$1 $2"
+
+	local result="$1"
+	
+	if isSpecialBlockDevice "$1"; then
+		result="${result}p"
+	fi
+
+	if [[ -n "$2" ]]; then
+		result="${result}$2"
+	fi
+
+	logExit "$rc"
+
+	return $rc
+	
 }
 
 # Input:
@@ -3017,12 +3038,10 @@ function bootedFromSD() {
 function getPartitionPrefix() { # device
 
 	logEntry "$1"
-	if [[ $1 =~ ^(mmcblk|loop|nvme|sd[a-z]) ]]; then
-		local pref="$1"
-		[[ $1 =~ ^(mmcblk|loop|nvme) ]] && pref="${1}p"
-	else
-		logItem "device: $1"
-		assertionFailed $LINENO "Unable to retrieve partition prefix for device $1"
+	local pref="$1"
+	
+	if isSpecialBlockDevice "$1"; then
+		pref="${1}p"
 	fi
 
 	logExit "$pref"
@@ -6037,7 +6056,7 @@ function restore() {
 
 			logCommand "parted -s $RESTORE_DEVICE print"
 
-			if [[ $RESTORE_DEVICE =~ "/dev/mmcblk[0-9]+" || $RESTORE_DEVICE =~ "/dev/loop[0-9]+" || $RESTORE_DEVICE =~ "/dev/nvme[0-9]+n[0-9]+" ]]; then
+			if isSpecialBlockDevice "$RESTORE_DEVICE"; then
 				ROOT_DEVICE=$(sed -E 's/p[0-9]+$//' <<< $ROOT_PARTITION)
 			else
 				ROOT_DEVICE=$(sed -E 's/[0-9]+$//' <<< $ROOT_PARTITION)
@@ -6676,6 +6695,8 @@ function deviceInfo() { # device, e.g. /dev/mmcblk1p2 or /dev/sda3 or /dev/nvme0
 
 	if [[ $1 =~ ^/dev/([^0-9]+)([0-9]+)$ || $1 =~ ^/dev/([^0-9]+[0-9]+)p([0-9]+)$ || $1 =~ ^/dev/([^0-9]+[0-9]+n[0-9])+p([0-9]+)$ ]]; then
 		r="${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
+	else
+		assertionFailed $LINENO "Unable to extract device info"
 	fi
 
 	echo "$r"
@@ -7330,20 +7351,13 @@ function restoreNonPartitionBasedBackup() {
 		exitError $RC_PARAMETER_ERROR
 	fi
 
-	if [[ $RESTORE_DEVICE =~ /dev/mmcblk[0-9] || $RESTORE_DEVICE =~ "/dev/loop" || $RESTORE_DEVICE =~ /dev/nvme[0-9]n[0-9] ]]; then
-		BOOT_PARTITION="${RESTORE_DEVICE}p1"
-	else
-		BOOT_PARTITION="${RESTORE_DEVICE}1"
-	fi
+	BOOT_PARTITION="$(makePartition "$RESTORE_DEVICE" 1)"
+	
 	logItem "BOOT_PARTITION : $BOOT_PARTITION"
 
 	ROOT_PARTITION_DEFINED=1
 	if [[ -z $ROOT_PARTITION ]]; then
-		if [[ $RESTORE_DEVICE =~ /dev/mmcblk[0-9] || $RESTORE_DEVICE =~ "/dev/loop" || $RESTORE_DEVICE =~ /dev/nvme[0-9]n[0-9] ]]; then
-			ROOT_PARTITION="${RESTORE_DEVICE}p2"
-		else
-			ROOT_PARTITION="${RESTORE_DEVICE}2"
-		fi
+		ROOT_PARTITION="$(makePartition "$RESTORE_DEVICE" 2)"
 		ROOT_PARTITION_DEFINED=0
 	else
 		if [[ ! -e "$ROOT_PARTITION" ]]; then
@@ -7375,7 +7389,7 @@ function restoreNonPartitionBasedBackup() {
 	if (( ! $ROOT_PARTITION_DEFINED )); then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_WARN_RESTORE_DEVICE_OVERWRITTEN $RESTORE_DEVICE
 	else
-		if [[ $ROOT_DEVICE =~ /dev/mmcblk0 || $ROOT_DEVICE =~ "/dev/loop" || $ROOT_DEVICE =~ /dev/nvme0n1 ]]; then
+		if isSpecialBlockDevice "$ROOT_DEVICE"; then
 			ROOT_DEVICE=$(sed -E 's/p[0-9]+$//' <<< $ROOT_PARTITION)
 		else
 			ROOT_DEVICE=$(sed -E 's/[0-9]+$//' <<< $ROOT_PARTITION)
@@ -7712,7 +7726,7 @@ function restorePartitionBasedPartition() { # restorefile
 
 	local restoreDevice
 	restoreDevice=${RESTORE_DEVICE%dev%%}
-	[[ $restoreDevice =~ mmcblk0 || $restoreDevice =~ "loop" || $restoreDevice =~ nvme0n1 ]] && restoreDevice="${restoreDevice}p"
+	restoreDevice="$(makePartition "$restoreDevice")"
 	logItem "RestoreDevice: $restoreDevice"
 
 	local mappedRestorePartition
@@ -8410,11 +8424,7 @@ function synchronizeCmdlineAndfstab() {
 
 	local CMDLINE FSTAB newPartUUID oldPartUUID BOOT_MP ROOT_MP newUUID oldUUID BOOT_PARTITION oldLABEL newLABEL
 
-	if [[ $RESTORE_DEVICE =~ /dev/mmcblk0 || $RESTORE_DEVICE =~ /dev/nvme0n1 || $RESTORE_DEVICE =~ "/dev/loop" ]]; then
-		BOOT_PARTITION="${RESTORE_DEVICE}p1"
-	else
-		BOOT_PARTITION="${RESTORE_DEVICE}1"
-	fi
+	BOOT_PARTITION="$(makePartition "$RESTORE_DEVICE" 1)"
 
 	if (( $PARTITIONBASED_BACKUP )); then
 		ROOT_PARTITION="$(sed 's/1$/2/' <<< "$BOOT_PARTITION")"
