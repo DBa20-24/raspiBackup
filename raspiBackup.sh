@@ -3020,9 +3020,9 @@ function makePartition() { # either device (mmcblk0, sda) or device name (/dev/m
 		result="${result}$2"
 	fi
 
-	logExit "$rc"
+	logExit "$result"
 
-	return $rc
+	echo "$result"
 	
 }
 
