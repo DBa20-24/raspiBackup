@@ -8495,6 +8495,42 @@ function doitRestore() {
 		exitError $RC_ENVIRONMENT_ERROR
 	fi
 
+	if (( $PARTITIONBASED_BACKUP )) && [[ -n $MOUNTPATHS_TO_RESTORE ]]; then
+
+		local errorFound=0
+		for mountPath in ${MOUNTPATHS_TO_RESTORE[@]}; do
+
+			if ! grep -Eq "^(/[^/ ]*)+/?$" <<< "$mountPath"; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_INVALID "$mountPath"
+				errorFound=1
+				continue
+			fi
+
+			if grep -Eq "_" <<< "$mountPath"; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_INVALID "$mountPath"
+				errorFound=1
+				continue
+			fi
+
+			if [[ ! -d  $mountPath ]]; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_FOUND "$mountPath"
+				errorFound=1
+				continue
+			fi			
+				
+			if ! isMounted "$mountPath"; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_MOUNTED "$mountPath"
+				errorFound=1
+				continue
+			fi
+
+		done
+		if (( $errorFound )); then
+			exitError $RC_EXTERNALMOUNT_ERROR
+		fi
+	fi
+
+	
 	BASE_DIR=$(dirname "$RESTOREFILE")
 	logItem "Basedir: $BASE_DIR"
 	HOSTNAME=$(basename "$RESTOREFILE" | sed -r 's/(.*)-[A-Za-z]+-backup-[0-9]+-[0-9]+.*/\1/')
