@@ -134,8 +134,8 @@ Anybody is welcome to create feature requests in github. They are either immedia
 
 ## Sample extensions
 
-There exist [sample extesions](./extensions) for raspiBackup which report for example memory usage, CPU temperature, disk usage and more. There exist also [user provided extensions](./extensions_userprovided). 
+There exist [sample extensions](./extensions) for raspiBackup which report for example memory usage, CPU temperature, disk usage and more. There exist also [user provided extensions](./extensions_userprovided). 
 
 ## Systemd
 
-Starting with installer release 0.4.8 a systemd timer is used to start raspiBackup on a regular base. cron was used in previous installer releases. The installer is backward compatible and is able to handle systems with cron setup. In addition the installer can be forced to use cron instead of systemd during installation with invocation option `-t crond`. Thank you very much to [Hofei](https://github.com/Hofei90) who helped to switch from cron to systemd timer.
+Starting with installer release 0.4.8 a systemd timer is used to start raspiBackup on a regular base. crond was used in previous installer releases. The installer is backward compatible and is able to handle systems with crond setup. In addition the installer can be forced to use crond instead of systemd during installation with invocation option `-t crond`. Thank you very much to [Hofei](https://github.com/Hofei90) who helped to switch from crond to systemd.

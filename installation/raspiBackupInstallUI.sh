@@ -1651,6 +1651,20 @@ BETA_INSTALL=0
 CRONTAB_ENABLED="undefined"
 SYSTEMD_ENABLED="undefined"
 
+function findUser() {
+
+	local u
+
+	if [[ -n "$SUDO_USER" ]]; then
+		u="$SUDO_USER"
+	else
+		u="$USER"
+	fi
+
+	echo "$u"
+
+}
+
 function existsLocalPropertiesFile() {
 	[[ -e "$LOCAL_PROPERTY_FILE" ]]
 }
@@ -1776,11 +1790,10 @@ function isInternetAvailable() {
 
 	logEntry
 
-	wget -q --spider $MYHOMEDOMAIN
-   local rc=$?
-
+	wget -q --spider -t 1 -T 3 $MYHOMEDOMAIN
+    local rc=$?
 	logExit $rc
-   return $rc
+    return $rc
 }
 
 function logEntry() {
@@ -2913,6 +2926,8 @@ function cleanup() {
 		rc=127
 	fi
 
+	chown "$CALLING_USER:$CALLING_USER" "$LOG_FILE" &> $LOG_FILE
+
 	exit $rc
 }
 
@@ -3300,7 +3315,7 @@ function config_time_do() {
 
 function config_crontime_do() {
 
-	local old=$(printf "%02d:%02d" $CONFIG_CRON_HOUR $CONFIG_CRON_MINUTE)
+	local old=$(printf "%02d:%02d" "$((10#$CONFIG_CRON_HOUR))" "$((10#$CONFIG_CRON_MINUTE))" )
 	current="$old"
 
 	logEntry "$old"
@@ -3323,7 +3338,7 @@ function config_crontime_do() {
 			else
 				CONFIG_CRON_HOUR=$(cut -f1 -d: <<< "$ANSWER")
 				CONFIG_CRON_MINUTE=$(cut -f2 -d: <<< "$ANSWER")
-				if (( CONFIG_CRON_HOUR > 23 || CONFIG_CRON_MINUTE > 59 )); then
+				if (( 10#$CONFIG_CRON_HOUR > 23 || 10#$CONFIG_CRON_MINUTE > 59 )); then
 					local m="$(getMessageText $MSG_INVALID_TIME "$ANSWER")"
 					local t=$(center $WINDOW_COLS "$m")
 					local ttm="$(getMessageText $TITLE_VALIDATIONERROR)"
@@ -3347,9 +3362,8 @@ function config_crontime_do() {
 
 function config_systemdtime_do() {
 
-	local old=$(printf "%02d:%02d" $CONFIG_SYSTEMD_HOUR $CONFIG_SYSTEMD_MINUTE)
+	local old=$(printf "%02d:%02d" "$((10#$CONFIG_SYSTEMD_HOUR))" "$((10#$CONFIG_SYSTEMD_MINUTE))")
 	current="$old"
-
 	logEntry "$old"
 
 	local b1="$(getMessageText $SELECT_TIME)"
@@ -3370,7 +3384,7 @@ function config_systemdtime_do() {
 			else
 				CONFIG_SYSTEMD_HOUR=$(cut -f1 -d: <<< "$ANSWER")
 				CONFIG_SYSTEMD_MINUTE=$(cut -f2 -d: <<< "$ANSWER")
-				if (( CONFIG_SYSTEMD_HOUR > 23 || CONFIG_SYSTEMD_MINUTE > 59 )); then
+				if (( 10#$CONFIG_SYSTEMD_HOUR > 23 || 10#$CONFIG_SYSTEMD_MINUTE > 59 )); then
 					local m="$(getMessageText $MSG_INVALID_TIME "$ANSWER")"
 					local t=$(center $WINDOW_COLS "$m")
 					local ttm="$(getMessageText $TITLE_VALIDATIONERROR)"
@@ -5182,6 +5196,8 @@ function askYesNo() { # message message_parms
 		return 0
 	fi
 }
+
+CALLING_USER="$(findUser)"
 
 INVOCATIONPARMS=""			# save passed opts for logging
 invocationParms=()			# and restart

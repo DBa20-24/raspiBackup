@@ -2396,7 +2396,18 @@ function isSupportedEnvironment() {
 	local OSRELEASE=/etc/os-release
 	local RPI_ISSUE=/etc/rpi-issue
 
-	logCommand "cat $OSRELEASE"
+	if [[ ! -e $OSRELEASE ]]; then
+		logItem "$OSRELEASE not found"
+		logExit 1
+		return 1
+	fi
+
+	logItem $(<$OSRELEASE)
+	grep -q -E -i "^(NAME|ID)=.*ubuntu" $OSRELEASE
+	local rc=$?
+
+	IS_UBUNTU=$(( ! $rc ))
+	logItem "IS_UBUNTU: $IS_UBUNTU"
 
 #	Check it's Raspberry HW
 	if [[ ! -e $MODELPATH ]]; then
@@ -2414,19 +2425,6 @@ function isSupportedEnvironment() {
 		return 0
 	fi
 	logItem "$RPI_ISSUE not found"
-
-	if [[ ! -e $OSRELEASE ]]; then
-		logItem "$OSRELEASE not found"
-		logExit 1
-		return 1
-	fi
-
-	logItem $(<$OSRELEASE)
-	grep -q -E -i "^(NAME|ID)=.*ubuntu" $OSRELEASE
-	local rc=$?
-
-	IS_UBUNTU=$(( ! $rc ))
-	logItem "IS_UBUNTU: $IS_UBUNTU"
 
 	logExit $rc
 	return $rc
@@ -3148,7 +3146,7 @@ function downloadPropertiesFile() { # FORCE
 			local func="B"; (( $RESTORE )) && func="R"
 			local srOptions="$(urlencode "$SMART_RECYCLE_OPTIONS")"
 			local srs=""; [[ -n $SMART_RECYCLE_DRYRUN ]] && (( ! $SMART_RECYCLE_DRYRUN )) && srs="$srOptions"
-			local os="rsp"; [[ -n $IS_UBUNTU ]] && os="ubu"
+			local os="rsp"; (( $IS_UBUNTU )) && os="ubu"
 			local downloadURL="${PROPERTIES_DOWNLOAD_URL}?version=$VERSION&type=$type&mode=$mode&keep=$keep&func=$func&srs=$srs&os=$os"
 		else
 			local downloadURL="$PROPERTIES_DOWNLOAD_URL"
@@ -4513,8 +4511,6 @@ function cleanupBackupDirectory() {
 
 	logEntry
 
-	logCommand "ls -la "$BACKUPTARGET_DIR""
-
 	if (( $rc != 0 )); then
 
 		if [[ -d "$BACKUPTARGET_DIR" ]]; then
@@ -4606,6 +4602,7 @@ function masqueradeSensitiveInfoInLog() {
 
 	logItem "Masquerading some mount options"
 	sed -i -E "s/username=[^,]+\,/username=${MASQUERADE_STRING},/" $LOG_FILE # used in cifs mount options
+	sed -i -E "s/password=[^,]+\,/password=${MASQUERADE_STRING},/" $LOG_FILE
 	sed -i -E "s/domain=[^,]+\,/domain=${MASQUERADE_STRING},/" $LOG_FILE
 
 	# telegram token and chatid
@@ -4730,13 +4727,12 @@ function cleanupStartup() { # trap
 
 	if [[ $1 == "SIGINT" ]]; then
 		# ignore CTRL-C now
-		trap '' SIGINT SIGTERM EXIT
+		trap '' SIGINT SIGTERM SIGHUP
 		rc=$RC_CTRLC
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_CTRLC_DETECTED
 	fi
 
 	cleanupTempFiles
-
 
 	logFinish
 
@@ -4802,7 +4798,6 @@ function cleanup() { # trap
 	finalCommand "$rc"
 
 	logItem "Terminate now with rc $CLEANUP_RC"
-	(( $CLEANUP_RC == 0 )) && saveVars
 
 	if (( $rc != 0 )); then
 		if (( ! $MAIL_ON_ERROR_ONLY )); then
@@ -4895,6 +4890,8 @@ function cleanup() { # trap
 	fi
 
 	logFinish
+
+	saveVars
 
 	callNotificationExtension $rc
 
@@ -5739,7 +5736,7 @@ function logSystemDiskState() {
 	logCommand "blkid"
 	logCommand "fdisk -l"
 	logCommand "mount"
-	logCommand "df -h"
+	logCommand "df -h -l"
 	logExit
 }
 
@@ -5821,11 +5818,12 @@ function restore() {
 				rc=$?
 				if (( $rc )); then
 					if (( $rc == 1 )); then
-						cp "$SF_FILE" "/tmp/$SF_FILE"
-						sed -i 's/sector-size/d' "/tmp/$SF_FILE"
-						sfdisk -f "$RESTORE_DEVICE" < "/tmp/$SF_FILE" &>>"$LOG_FILE"
+						local tmpSF="$(basename $SF_FILE)"
+						cp "$SF_FILE" "/tmp/$tmpSF"
+						sed -i 's/sector-size/d' "/tmp/$tmpSF"
+						sfdisk -f "$RESTORE_DEVICE" < "/tmp/$tmpSF" &>>"$LOG_FILE"
 						rc=$?
-						rm "/tmp/$SF_FILE"
+						rm "/tmp/$tmpSF"
 					fi
 				fi
 				if (( $rc )); then
@@ -6716,12 +6714,12 @@ function inspect4Backup() {
 		# test whether boot device is mounted
 		local bootMountpoint="/boot"
 		local bootPartition=$(findmnt $bootMountpoint -o source -n) # /dev/mmcblk0p1, /dev/loop01p or /dev/sda1 or /dev/nvme0n1p1
-		logItem "$bootMountpoint mounted? $bootPartition"
+		logItem "bootMountpoint1: $bootMountpoint mounted? $bootPartition"
 
 		if [[ -z $bootPartition ]]; then
 			bootMountpoint="/boot/firmware"
 			local bootPartition=$(findmnt $bootMountpoint -o source -n) # /dev/mmcblk0p1, /dev/loop01p or /dev/sda1 or /dev/nvme0n1p1
-			logItem "$bootMountpoint mounted? $bootPartition"
+			logItem "bootMountpoint2: $bootMountpoint mounted? $bootPartition"
 		fi
 
 		# test whether some other /boot path is mounted
@@ -6731,9 +6729,13 @@ function inspect4Backup() {
 			logItem "Some path in /boot mounted? $bootPartition on $bootMountpoint"
 		fi
 
+		logItem "bootMountpoint: $bootMountpoint, bootPartition: $bootPartition"
+		
+		logItem "Starting root discovery"
+
 		# find root partition
 		local rootPartition=$(findmnt / -o source -n) # /dev/root or /dev/sda1 or /dev/mmcblk1p2 or /dev/nvme0n1p2
-		logItem "/ mounted? $rootPartition"
+		logItem "rootPartition: / mounted? $rootPartition"
 		if [[ $rootPartition == "/dev/root" ]]; then
 			local rp=$(grep -E -o "root=[^ ]+" /proc/cmdline)
 			rootPartition=${rp#/root=/}
@@ -8482,6 +8484,8 @@ function synchronizeCmdlineAndfstab() {
 			else
 				rootLabelCreated=1
 			fi
+		elif grep "root=/dev/" $CMDLINE; then
+			logItem "/dev detected in $CMDLINE"
 		else
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_UUID_SYNCHRONIZED "$cmdline" "root="
 		fi
@@ -8532,6 +8536,8 @@ function synchronizeCmdlineAndfstab() {
 					rootLabelCreated=1
 				fi
 			fi
+		elif grep "^/dev/" $FSTAB; then
+			logItem "/dev detected in $FSTAB"
 		else
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_UUID_SYNCHRONIZED "$fstab" "/"
 		fi
@@ -8574,6 +8580,8 @@ function synchronizeCmdlineAndfstab() {
 				local cmd="dosfslabel $BOOT_PARTITION $oldLABEL"
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_LABELING_FAILED "$cmd" "$rc"
 			fi
+		elif grep "^/dev/" $FSTAB; then
+			logItem "/dev detected in $FSTAB"
 		else
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_UUID_SYNCHRONIZED "$fstab" "/boot"
 		fi
@@ -9037,7 +9045,7 @@ if (( $# == 1 )); then
 	fi
 fi
 
-if (( $UID != 0 )); then
+if (( $UID != 0 && ! INCLUDE_ONLY )); then
 	LOG_LEVEL=$LOG_NONE
 	writeToConsole $MSG_LEVEL_MINIMAL $MSG_RUNASROOT "$0" "$INVOCATIONPARMS"
 	exitError $RC_MISC_ERROR
@@ -9385,9 +9393,9 @@ while (( "$#" )); do
 	  ;;
 
 	-T)
-	  checkOptionParameter "$1" "$2"
+	  o="$(checkOptionParameter "$1" "$2")"
 	  (( $? )) && exitError $RC_PARAMETER_ERROR
-	  PARTITIONS_TO_BACKUP="$2"; shift 2
+	  PARTITIONS_TO_BACKUP="$o"; shift 2
 	  ;;
 
 	--telegramToken)
