@@ -7231,8 +7231,15 @@ function inspect4Backup() {
 		# check for /boot on root partition
 		if [[ -z "$bootPartition" ]]; then
 			if ! find $bootMountpoint -name cmdline.txt; then
-				writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_BOOTDEVICE_FOUND
-				exitError $RC_MISC_ERROR
+				logItem "No cmdline.txt found in $bootMountpoint"
+				# no RaspbianOS
+				if [[ -n $rootPartition ]] && (( UNSUPPORTED_ENVIRONMENT )) && (( IS_UBUNTU )); then	# for example ubuntu on orange
+					bootPartition="$rootPartition"
+					logItem "Assuming bootpartition is located on rootpartition $rootPartition"
+				else
+					writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_BOOTDEVICE_FOUND
+					exitError $RC_MISC_ERROR
+				fi
 			else
 				bootPartition="$rootPartition"
 				logItem "Bootpartition is located on rootpartition $bootPartition"
