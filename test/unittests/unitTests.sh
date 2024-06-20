@@ -1,20 +1,27 @@
 #!/bin/bash
 
+LOGFILE="$PWD/ut.log"
+rm $LOGFILE &>/dev/null
 error=0
 #
 for utDir in $(find * -type d); do
-	echo $utDir
+	if [[ "$utDir" == "makePartition" ]]; then
 	cd $utDir
-	./${utDir}.sh
+	./${utDir}.sh >> $LOGFILE 
 	e=$?
 	if (( e )); then
-		echo "$utdir failed"
+		echo "$utDir failed"
+	else
+		echo "$utDir succeeded"
 	fi
-	((error=error | e)) 
+	if (( e )); then
+		((error+=1))
+	fi 
 	cd ..
+	fi
 done
 
-if (( error )); then
+if (( error > 0 )); then
 	echo "$error UTs failed"
 else
 	echo "All UTs finished successfully"

@@ -9585,8 +9585,6 @@ fi
 logEnable
 lockingFramework
 
-trapWithArg cleanupStartup SIGINT SIGTERM EXIT
-
 INVOCATIONPARMS=""			# save passed opts for logging
 for (( i=1; i<=$#; i++ )); do
 	p=${!i}
@@ -9595,6 +9593,10 @@ done
 
 readConfigParameters				# overwrite defaults with settings in config files
 copyDefaultConfigVariables			# and update variables with config file contents
+
+if (( ! INCLUDE_ONLY )); then
+
+trapWithArg cleanupStartup SIGINT SIGTERM EXIT
 
 logOptions "Standard option files"
 
@@ -10022,8 +10024,6 @@ while (( "$#" )); do
 	  ;;
   esac
 done
-
-if (( ! $INCLUDE_ONLY )); then
 
 # set positional arguments in argument list $@
 set -- "$PARAMS"

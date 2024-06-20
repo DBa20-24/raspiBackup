@@ -1,3 +1,7 @@
-#/bin/bash
+#/bin/bash -x
 source ../../../raspiBackup.sh
-exit 1
+#sudo ../../../raspiBackup.sh --include
+#source ./t.inc
+echo "RC inc $?"
+exit 1 
+
