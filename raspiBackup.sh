@@ -8198,6 +8198,99 @@ function lastUsedPartitionByte() { # device
 
 }
 
+function makeFilesystemAndLabel() { # partition filesystem
+
+	logEntry "$1 $2"
+
+	local partition="$1"
+	local partitionFilesystem="$2"
+
+	if [[ ! "$partitionFilesystem" =~ $SUPPORTED_PARTITIONBACKUP_PARTITIONTYPE_REGEX ]]; then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNSUPPORTED_FILESYSTEM_FORMAT "$partitionFilesystem" "$partition"
+		exitError $RC_MISC_ERROR
+	fi
+
+	logItem "partitionFilesystem: \"$partitionFilesystem\""
+
+	local fs="$partitionFilesystem"
+	local fatSize=""
+	local fatCmd=""
+
+	local swapDetected=0
+	if [[ "$partitionFilesystem" =~ ^fat.* ]]; then
+		fs="vfat"
+		fatSize=$(sed 's/fat//' <<< $partitionFilesystem)
+		fatCmd="-I -F $fatSize"
+		logItem "fs: $fs - fatSize: $fatSize - fatCmd: $fatCmd"
+		cmd="mkfs -t $fs $fatCmd"
+	elif [[ "$partitionFilesystem" =~ swap ]]; then
+		cmd="mkswap"
+		swapDetected=1
+		logItem "Swap partition"
+	else
+		logItem "Normal partition with $partitionFilesystem"
+		if [[ $partitionFilesystem == "btrfs" ]]; then
+			check4RequiredCommands btrfs
+			cmd="mkfs.btrfs -f"
+					elif [[ $partitionFilesystem == "f2fs" ]]; then
+							check4RequiredCommands f2fs
+							if [[ -n $partitionLabel ]]; then
+									cmd="mkfs.f2fs -f -l $partitionLabel "
+							else
+									cmd="mkfs.f2fs -f"
+							fi
+		else
+			cmd="mkfs -t $fs"
+		fi
+	fi
+
+	cmd="$cmd -F"
+
+	writeToConsole $MSG_LEVEL_DETAILED $MSG_FORMATTING "$partition" "$partitionFilesystem" $fileSystemsize
+	logItem "$cmd $mappedRestorePartition"
+
+	$cmd $partition # &>>"$LOG_FILE"
+
+	rc=$?
+	if (( $rc )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MKFS_FAILED "$cmd $partition" "$rc"
+		exitError $RC_MISC_ERROR
+	fi
+
+	if (( ! $swapDetected )); then
+
+		# Keep SUPPORTED_PARTITIONBACKUP_PARTITIONTYPE_REGEX in sync
+
+		if [[ -n $partitionLabel ]]; then
+			writeToConsole $MSG_LEVEL_DETAILED $MSG_LABELING "$artition" "$partitionLabel"
+
+			case $partitionFilesystem in
+				ext2|ext3|ext4) cmd="e2label"
+					;;
+				fat16|fat32) cmd="dosfslabel"
+					;;
+				btrfs) cmd="btrfs filesystem label"
+					;;
+				f2fs) cmd=": noop until f2fs 1.5 is available on Raspberries # <f2fs label command>"
+					 ;;
+			esac
+
+			logItem "$cmd $artition $partitionLabel"
+			$cmd $partition $partitionLabel &>>"$LOG_FILE"
+			rc=$?
+			if (( $rc )); then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_LABELING_FAILED "$cmd $partition $partitionLabel" "$rc"
+				exitError $RC_LABEL_ERROR
+			fi
+		else
+				logItem "Partition $partition not labeled"
+		fi
+	fi
+
+	logExit
+
+}
+
 function restorePartitionBasedPartition() { # restorefile
 
 	logEntry "$1"
