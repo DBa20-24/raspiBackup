@@ -5,20 +5,22 @@ rm $LOGFILE &>/dev/null
 error=0
 #
 for utDir in $(find * -type d); do
-	if [[ "$utDir" == "makePartition" ]]; then
+	#if [[ "$utDir" == "makePartition" ]]; then
+	#if [[ "$utDir" == "resizeLastPartition" ]]; then
+    echo "Executing ${utDir}.sh"
 	cd $utDir
 	./${utDir}.sh >> $LOGFILE 
 	e=$?
 	if (( e )); then
-		echo "$utDir failed"
+		echo "??? Unittest $utDir failed"
 	else
-		echo "$utDir succeeded"
+		: echo "$utDir succeeded"
 	fi
 	if (( e )); then
 		((error+=1))
 	fi 
 	cd ..
-	fi
+	#fi
 done
 
 if (( error > 0 )); then

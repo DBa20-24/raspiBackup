@@ -32,7 +32,7 @@ testFile=$(mktemp)
 GB128=128035676160 # sectors 250069680
 GB32=31268536320 # sectors 61071360
 
-function test_createResizedSFDisk() { # sfdisk_file target_size new_partition_size 
+function test_createResizedSFDisk() { # sfdisk_file target_size new_partition_size
 
 	local targetSize=$2
 	local targetPartitionSize=$3
@@ -47,14 +47,14 @@ function test_createResizedSFDisk() { # sfdisk_file target_size new_partition_si
 
 	if (( resizedSize != targetSize )); then
 		if [[ -z $4 ]] || (( new > 0 )); then
-			echo -n "??? --- " 
+			echo -n "??? --- "
 			echo "$1: Expected disk size: $targetSize ($(bytesToHuman $targetSize)) - Received: $resizedSize ($(bytesToHuman $resizedSize))"
 			fail=1
 			(( errors ++ ))
 			return
 		fi
 	fi
-	
+
 	if (( new != targetPartitionSize )); then
 		echo -n "??? --- "
 		fail=1
@@ -94,7 +94,7 @@ if (( executeCalcTest )); then
 	echo
 	echo "--- test_calcSumSizeFromSFDISK ---"
 	echo
-	test_calcSumSizeFromSFDISK "32GB.sfdisk" 31268536320
+	test_calcSumSizeFromSFDISK "$PWD/32GB.sfdisk" 31268536320
 	test_calcSumSizeFromSFDISK "32GB.sfdisk" 31268536320
 	test_calcSumSizeFromSFDISK "32GB_nosecsize.sfdisk" 31268536320
 	test_calcSumSizeFromSFDISK "128GB.sfdisk" 128035676160
@@ -111,7 +111,7 @@ if (( executeCalcTest )); then
 	test_calcSumSizeFromSFDISK "28+95+5GB-2ext.sfdisk" 128035676160
 	test_calcSumSizeFromSFDISK "mmcblk0.sfdisk" 31268536320
 	test_calcSumSizeFromSFDISK "mmcblk0-2ext.sfdisk" 31268536320
-	test_calcSumSizeFromSFDISK "nvme0n1.sfdisk" 128035676160
+	test_calcSumSizeFromSFDISK "$PWD/nvme0n1.sfdisk" 128035676160
 fi
 
 if (( executeResizeTest )); then
@@ -135,8 +135,8 @@ if (( executeResizeTest )); then
 #	test_createResizedSFDisk "10+22GB-1ext.sfdisk" 128035676160 116757192704
 fi
 
-#rm $testFile
-mv $testFile test.sfdisk
+rm $testFile
+#mv $testFile test.sfdisk
 
 echo
 if (( errors > 0 )); then
