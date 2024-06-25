@@ -9678,6 +9678,10 @@ fi
 logEnable
 lockingFramework
 
+if (( !INCLUDE_ONLY )); then
+	trapWithArg cleanupStartup SIGINT SIGTERM EXIT
+fi	
+
 INVOCATIONPARMS=""			# save passed opts for logging
 for (( i=1; i<=$#; i++ )); do
 	p=${!i}
@@ -9686,10 +9690,6 @@ done
 
 readConfigParameters				# overwrite defaults with settings in config files
 copyDefaultConfigVariables			# and update variables with config file contents
-
-if (( ! INCLUDE_ONLY )); then
-
-trapWithArg cleanupStartup SIGINT SIGTERM EXIT
 
 logOptions "Standard option files"
 
@@ -10118,6 +10118,8 @@ while (( "$#" )); do
   esac
 done
 
+if (( ! $INCLUDE_ONLY )); then
+
 # set positional arguments in argument list $@
 set -- "$PARAMS"
 
@@ -10208,7 +10210,7 @@ logItem "RESTORE: $RESTORE - fileParameter: $fileParameter"
 if [[ -n $fileParameter ]]; then
 	if (( $RESTORE )); then
 		RESTOREFILE="$(readlink -f "$fileParameter")"
-	els
+	else
 		BACKUPPATH="$(readlink -f "$fileParameter")"
 	fi
 fi

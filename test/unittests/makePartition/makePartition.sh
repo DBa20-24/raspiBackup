@@ -1,13 +1,11 @@
 #!/bin/bash
 
-source ../../../raspiBackup.sh
-
-trap '' SIGINT SIGTERM SIGHUP
-
 IS_SPECIAL_DEVICE="/dev/mmcblk0p1 mmcblk0p1 /dev/mmcblk0 mmcblk0 /dev/mmcblk mmcblk loop nvme"
 IS_NOSPECIAL_DEVICE="/dev/sda1 sda1 /dev/sda sda"
 
 error=0
+
+source ../../../raspiBackup.sh
 
 echo "Testing makePartition"
 for p in ${IS_SPECIAL_DEVICE[@]}; do

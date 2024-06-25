@@ -3,6 +3,7 @@
 LOGFILE="$PWD/ut.log"
 rm $LOGFILE &>/dev/null
 error=0
+
 #
 for utDir in $(find * -type d); do
 	#if [[ "$utDir" == "makePartition" ]]; then
@@ -10,7 +11,8 @@ for utDir in $(find * -type d); do
     echo "Executing ${utDir}.sh"
 	cd $utDir
 	./${utDir}.sh >> $LOGFILE 
-	e=$?
+	e=$?	
+	mv /tmp/${utDir}.log . # move debug into UT dir
 	if (( e )); then
 		echo "??? Unittest $utDir failed"
 	else
