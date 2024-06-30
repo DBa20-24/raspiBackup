@@ -1,12 +1,20 @@
 #!/bin/bash
 
+PGM=`basename $0`
+
+if [ `id -u` != 0 ]
+then
+    echo -e "$PGM needs to be run as root.\n"
+    exit 1
+fi
+
 source ../../../raspiBackup.sh
 
 DEVICE_FILE="device.dd"
 SFDISK_FILE="mkfs.sfdisk"
 LOOP_DEVICE=""
 
-trap "{ sudo losetup -D; rm $DEVICE_FILE;}" SIGINT SIGTERM SIGHUP
+trap "{ echo "Cleanup"; sudo losetup -D; rm $DEVICE_FILE;}" SIGINT SIGTERM SIGHUP
 
 function createDeviceWithPartition() {
 
@@ -23,9 +31,9 @@ error=0
 
 createDeviceWithPartition
 
-makeFilesystemAndLabel /dev/loop0 fat
+makeFilesystemAndLabel $LOOP_DEVICE fat32
 
-exit
+lsblk -o fstype $LOOP_DEVICE
 
 echo "Testing makePartition"
 for p in ${IS_SPECIAL_DEVICE[@]}; do

@@ -8244,10 +8244,8 @@ function makeFilesystemAndLabel() { # partition filesystem
 		fi
 	fi
 
-	cmd="$cmd -F"
-
 	writeToConsole $MSG_LEVEL_DETAILED $MSG_FORMATTING "$partition" "$partitionFilesystem" $fileSystemsize
-	logItem "$cmd $mappedRestorePartition"
+	logItem "$cmd $partition"
 
 	$cmd $partition # &>>"$LOG_FILE"
 
