@@ -13,58 +13,42 @@ source ../../../raspiBackup.sh
 DEVICE_FILE="device.dd"
 SFDISK_FILE="mkfs.sfdisk"
 LOOP_DEVICE=""
+FILE_SYSTEMS=(fat16 fat32 ext2 ext3 ext4 btrfs f2fs)
+LABELS=(fat16Label fat32Label ext2Label ext3Label ext4Label btrfsLabel f2fsLabel)
 
-trap "{ echo "Cleanup"; sudo losetup -D; rm $DEVICE_FILE;}" SIGINT SIGTERM SIGHUP
+trap "{ losetup -D; rm $DEVICE_FILE; rm $SFDISK_FILE; }" SIGINT SIGTERM SIGHUP EXIT 
 
 function createDeviceWithPartition() {
 
 	LOOP_DEVICE="$(losetup -f)"
 
-	truncate -s 1G $DEVICE_FILE
-	sfdisk -f $DEVICE_FILE < $SFDISK_FILE
-	losetup -P $LOOP_DEVICE	$DEVICE_FILE
+	truncate -s 1G $DEVICE_FILE &>> $LOG_FILE
+	sfdisk -f $DEVICE_FILE < $SFDISK_FILE &>> $LOG_FILE
+	losetup -P $LOOP_DEVICE	$DEVICE_FILE &>> $LOG_FILE
 
-	lsblk -o +fstype
 }
 
 error=0
-
 createDeviceWithPartition
 
-makeFilesystemAndLabel $LOOP_DEVICE fat32
-
-lsblk -o fstype $LOOP_DEVICE
-
-echo "Testing makePartition"
-for p in ${IS_SPECIAL_DEVICE[@]}; do
-	echo "Testing $p ..."
-	pref="$(makePartition "$p")"
-	if [[ "$pref" != "${p}p" ]]; then
-		echo "Error $p - got $pref"
-		error=1
+for (( i=0; i<${#FILE_SYSTEMS[@]}; i++ )); do
+	fs=${FILE_SYSTEMS[$i]}
+	label=${LABELS[$i]}
+	echo "Creating and labeling -${fs}- ..."
+	makeFilesystemAndLabel $LOOP_DEVICE $fs $label
+	crtFs=$(blkid -o udev $LOOP_DEVICE | grep "ID_FS_TYPE=" | cut -f 2 -d "=")
+	if [[ "$crtFs" != "$fs" ]]; then
+		if [[ $fs =~ "fat" && $crtFs == "vfat" ]]; then
+			:
+		else
+			echo "Error fs $fs. Detected: $crtFs"
+			(( error ++ ))
+		fi
 	fi
-	echo "Testing $p 1 ..."
-	pref="$(makePartition "$p" 1)"
-	if [[ "$pref" != "${p}p1" ]]; then
-		echo "Error $p - got $pref"
-		error=1
-	fi
-done
-
-echo
-echo "Testing makePartition - no prefix"
-for p in ${IS_NOSPECIAL_DEVICE[@]}; do
-	echo "Testing $p ..."
-	pref="$(makePartition "$p")"
-	if [[ "$pref" != "$p" ]]; then
-		echo "Error $p - got $pref"
-		error=1
-	fi
-	echo "Testing $p 2 ..."
-	pref="$(makePartition "$p" 2)"
-	if [[ "$pref" != "${p}2" ]]; then
-		echo "Error $p - got $pref"
-		error=1
+	crtLb=$(blkid -o udev $LOOP_DEVICE | grep "ID_FS_LABEL=" | cut -f 2 -d "=")
+	if [[ "$crtLb" != "$label" ]]; then
+		echo "Error label -${label}-. Detected: -${crtLb}-"
+		(( error ++ ))
 	fi
 done
 

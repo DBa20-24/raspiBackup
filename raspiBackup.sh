@@ -5025,7 +5025,7 @@ function cleanupStartup() { # trap
 
 	if [[ $1 == "SIGINT" ]]; then
 		# ignore CTRL-C now
-		trap '' SIGINT SIGTERM SIGHUP
+		trap '' SIGINT SIGTERM SIGHUP EXIT
 		rc=$RC_CTRLC
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_CTRLC_DETECTED
 	fi
@@ -5068,7 +5068,7 @@ function cleanup() { # trap
 
 	if [[ $1 == "SIGINT" ]]; then
 		# ignore CTRL-C now
-		trap '' SIGINT SIGTERM EXIT
+		trap '' SIGINT SIGTERM SIGHUP EXIT
 		rc=$RC_CTRLC
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_CTRLC_DETECTED
 	fi
@@ -8198,12 +8198,13 @@ function lastUsedPartitionByte() { # device
 
 }
 
-function makeFilesystemAndLabel() { # partition filesystem
+function makeFilesystemAndLabel() { # partition filesystem label
 
 	logEntry "$1 $2"
 
 	local partition="$1"
 	local partitionFilesystem="$2"
+	local partitionLabel="$3"
 
 	if [[ ! "$partitionFilesystem" =~ $SUPPORTED_PARTITIONBACKUP_PARTITIONTYPE_REGEX ]]; then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNSUPPORTED_FILESYSTEM_FORMAT "$partitionFilesystem" "$partition"
@@ -8232,13 +8233,13 @@ function makeFilesystemAndLabel() { # partition filesystem
 		if [[ $partitionFilesystem == "btrfs" ]]; then
 			check4RequiredCommands btrfs
 			cmd="mkfs.btrfs -f"
-					elif [[ $partitionFilesystem == "f2fs" ]]; then
-							check4RequiredCommands f2fs
-							if [[ -n $partitionLabel ]]; then
-									cmd="mkfs.f2fs -f -l $partitionLabel "
-							else
-									cmd="mkfs.f2fs -f"
-							fi
+		elif [[ $partitionFilesystem == "f2fs" ]]; then
+			check4RequiredCommands f2fs
+			if [[ -n $partitionLabel ]]; then
+				cmd="mkfs.f2fs -f -l $partitionLabel "
+			else
+				cmd="mkfs.f2fs -f"
+			fi
 		else
 			cmd="mkfs -t $fs"
 		fi
@@ -8247,7 +8248,7 @@ function makeFilesystemAndLabel() { # partition filesystem
 	writeToConsole $MSG_LEVEL_DETAILED $MSG_FORMATTING "$partition" "$partitionFilesystem" $fileSystemsize
 	logItem "$cmd $partition"
 
-	$cmd $partition # &>>"$LOG_FILE"
+	$cmd $partition &>>"$LOG_FILE"
 
 	rc=$?
 	if (( $rc )); then
@@ -8260,7 +8261,7 @@ function makeFilesystemAndLabel() { # partition filesystem
 		# Keep SUPPORTED_PARTITIONBACKUP_PARTITIONTYPE_REGEX in sync
 
 		if [[ -n $partitionLabel ]]; then
-			writeToConsole $MSG_LEVEL_DETAILED $MSG_LABELING "$artition" "$partitionLabel"
+			writeToConsole $MSG_LEVEL_DETAILED $MSG_LABELING "$partition" "$partitionLabel"
 
 			case $partitionFilesystem in
 				ext2|ext3|ext4) cmd="e2label"
@@ -9674,9 +9675,9 @@ if (( $UID != 0 && ! INCLUDE_ONLY )); then
 fi
 
 logEnable
-lockingFramework
 
 if (( !INCLUDE_ONLY )); then
+	lockingFramework
 	trapWithArg cleanupStartup SIGINT SIGTERM EXIT
 fi	
 
