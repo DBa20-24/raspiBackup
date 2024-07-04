@@ -141,7 +141,7 @@ LATEST_TEMP_PROPERTY_FILE="/tmp/$PROPERTY_FILE"
 VAR_LIB_DIRECTORY="/var/lib/$MYNAME"
 RESTORE_REMINDER_FILE="restore.reminder"
 VARS_FILE="/tmp/$MYNAME.vars"
-TEMPORARY_MOUNTPOINT_ROOT="/tmp"
+TEMPORARY_MOUNTPOINT_ROOT="/tmp/$MYNAME"
 LOGFILE_EXT=".log"
 LOGFILE_NAME="${MYNAME}${LOGFILE_EXT}"
 LOGFILE_RESTORE_EXT=".logr"
@@ -1982,13 +1982,16 @@ MSG_EN[$MSG_EXTERNAL_MOUNT_NOT_FOUND]="RBK0309E: External mountpoint '%s' does n
 MSG_DE[$MSG_EXTERNAL_MOUNT_NOT_FOUND]="RBK0309E: Externer Mountpoint '%s' existiert nicht."
 MSG_PROCESSING_EXTERNAL_MOUNTPOINT=310
 MSG_EN[$MSG_PROCESSING_EXTERNAL_MOUNTPOINT]="RBK0310I: Saving external mountpoint %s (%s) ..."
-MSG_DE[$MSG_PROCESSING_EXTERNAL_MOUNTPOINT]="RBK0310I: Externe Mountpoint%s (%s) wird gesichert ..."
+MSG_DE[$MSG_PROCESSING_EXTERNAL_MOUNTPOINT]="RBK0310I: Externer Mountpoint %s (%s) wird gesichert ..."
 MSG_BACKUP_EXTERNAL_MOUNTPOINT_FAILED=311
 MSG_EN[$MSG_BACKUP_EXTERNAL_MOUNTPOINT_FAILED]="RBK0311E: Backup of external mointpoint %s failed with RC %s."
 MSG_DE[$MSG_BACKUP_EXTERNAL_MOUNTPOINT_FAILED]="RBK0311E: Sicherung des externen Mountpoints %s schlug fehl mit RC %s."
 MSG_PROCESSED_EXTERNAL_MOUNTPOINT=312
 MSG_EN[$MSG_PROCESSED_EXTERNAL_MOUNTPOINT]="RBK0312I: External mointpoint %s was saved."
 MSG_DE[$MSG_PROCESSED_EXTERNAL_MOUNTPOINT]="RBK0312I: Externer Mountpoint %s wurde gesichert."
+MSG_RESTORING_MOUNTPOINTS=313
+MSG_EN[$MSG_RESTORING_MOUNTPOINTS]="RBK0313W: Restoring %s mointpoints to %s."
+MSG_DE[$MSG_RESTORING_MOUNTPOINTS]="RBK0313W: %s Mountpoints werden auf %s zurüchgespielt."
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -2723,8 +2726,8 @@ function logOptions() { # option state
 	logItem "APPEND_LOG=$APPEND_LOG"
 	logItem "APPEND_LOG_OPTION=$APPEND_LOG_OPTION"
 	logItem "BACKUPPATH=$BACKUPPATH"
-	logItem "MOUNTPATHS_TO_BACKUP=$MOUNTPATHS_TO_BACKUP"
-	logItem "MOUNTPATHS_TO_RESTORE=$MOUNTPATHS_TO_RESTORE"
+	logItem "MOUNTPOINTS_TO_BACKUP=$MOUNTPOINTS_TO_BACKUP"
+	logItem "MOUNTPOINTS_TO_RESTORE=$MOUNTPOINTS_TO_RESTORE"
 	logItem "BACKUPTYPE=$BACKUPTYPE"
 	logItem "BEFORE_STOPSERVICES=$BEFORE_STOPSERVICES"
 	logItem "BOOT_DEVICE=$BOOT_DEVICE"
@@ -2889,8 +2892,8 @@ function initializeDefaultConfigVariables() {
 	DEFAULT_PARTITIONS_TO_BACKUP="1 2"
 	DEFAULT_PARTITIONS_TO_RESTORE="1 2"
 	# backup and restore no external partitions
-	DEFAULT_MOUNTPATHS_TO_BACKUP=""
-	DEFAULT_MOUNTPATHS_TO_RESTORE=""
+	DEFAULT_MOUNTPOINTS_TO_BACKUP=""
+	DEFAULT_MOUNTPOINTS_TO_RESTORE=""
 	# language (DE or EN)
 	DEFAULT_LANGUAGE=""
 	# hosts which will get the updated backup script with parm -y - non pwd access with keys has to be enabled
@@ -2981,7 +2984,7 @@ function copyDefaultConfigVariables() {
 	BACKUPTYPE="$DEFAULT_BACKUPTYPE"
 	BOOT_DEVICE="$DEFAULT_BOOT_DEVICE"
 	AFTER_STARTSERVICES="$DEFAULT_AFTER_STARTSERVICES"
-	MOUNTPATHS_TO_BACKUP="$DEFAULT_MOUNTPATHS_TO_BACKUP"
+	MOUNTPOINTS_TO_BACKUP="$DEFAULT_MOUNTPOINTS_TO_BACKUP"
 	BEFORE_STOPSERVICES="$DEFAULT_BEFORE_STOPSERVICES"
 	CHECK_FOR_BAD_BLOCKS="$DEFAULT_CHECK_FOR_BAD_BLOCKS"
 	COLOR_CODES=("${DEFAULT_COLOR_CODES[0]}" "${DEFAULT_COLOR_CODES[1]}")
@@ -3027,7 +3030,7 @@ function copyDefaultConfigVariables() {
 	RESIZE_ROOTFS="$DEFAULT_RESIZE_ROOTFS"
 	RESTORE_DEVICE="$DEFAULT_RESTORE_DEVICE"
 	RESTORE_EXTENSIONS="$DEFAULT_RESTORE_EXTENSIONS"
-	MOUNTPATHS_TO_RESTORE="$DEFAULT_MOUTPATHS_TO_RESTORE"
+	MOUNTPOINTS_TO_RESTORE="$DEFAULT_MOUTPATHS_TO_RESTORE"
 	RESTORE_REMINDER_INTERVAL="$DEFAULT_RESTORE_REMINDER_INTERVAL"
 	RESTORE_REMINDER_REPEAT="$DEFAULT_RESTORE_REMINDER_REPEAT"
 	RSYNC_BACKUP_ADDITIONAL_OPTIONS="$DEFAULT_RSYNC_BACKUP_ADDITIONAL_OPTIONS"
@@ -6288,7 +6291,7 @@ function restoreNormalBackupType() {
 			fi
 			;;
 
-		*)	MNT_POINT="$TEMPORARY_MOUNTPOINT_ROOT/${MYNAME}"
+		*)	MNT_POINT="$TEMPORARY_MOUNTPOINT_ROOT"
 
 			if ( isMounted "$MNT_POINT" ); then
 				logItem "$MNT_POINT mounted - unmouting"
@@ -6702,7 +6705,7 @@ function mountMountpoints() { # sourcePath
 
 	if (( ! $FAKE )); then
 		logItem "BEFORE: mount $(mount)"
-		for mountpoint in "${MOUNTPATHS_TO_BACKUP[@]}"; do
+		for mountpoint in "${MOUNTPOINTS_TO_BACKUP[@]}"; do
 			mountpointName="$BOOT_PARTITION_PREFIX$partition"
 			logItem "mkdir $1/$mountpointName"
 			mkdir "$1/$mountpointName" &>>"$LOG_FILE"
@@ -6807,11 +6810,11 @@ function backupMountpoints() {
 
 	local mountpoint
 
-	logItem "MOUNTPATHS_TO_BACKUP: $(echo ${MOUNTPATHS_TO_BACKUP[@]})"
+	logItem "MOUNTPOINTS_TO_BACKUP: $(echo ${MOUNTPOINTS_TO_BACKUP[@]})"
 
 	writeToConsole $MSG_LEVEL_MINIMAL $MSG_BACKUP_STARTED "$BACKUPTYPE"
 
-	for mountPoint in ${MOUNTPATHS_TO_BACKUP[@]}; do
+	for mountPoint in ${MOUNTPOINTS_TO_BACKUP[@]}; do
 		logItem "Processing external mountpoint $mountPoint"
 
 		local used="$(df -h $mountPoint | tail -n 1 | awk '{ print $3;'})"
@@ -7615,22 +7618,24 @@ function doitBackup() {
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_DEVICEMOUNTED "$BACKUPPATH"
 			exitError $RC_MISC_ERROR
 		fi
-		# check if a mount to any partition on boot device exists
-		logItem "BOOT_DEVICE: $BOOT_DEVICE"
-		local lsblkResult="$(lsblk -l -o name,mountpoint | grep "${BACKUPPATH}" | grep $BOOT_DEVICE)"
+		# check if backup partition is a local mount
+		logItem "BOOT_DEVICENAME: $BOOT_DEVICENAME"
+		local lsblkResult="$(lsblk -l -o name,mountpoint | grep "${BACKUPPATH}" | grep $BOOT_DEVICENAME)"
 		logItem "lsblkResult: $lsblkResult"
-		local di=($(deviceInfo /dev/$lsblkResult))
-		logItem "di: $di"
-		if [[ "$BOOT_DEVICE" == "${di[0]}" ]]; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_DEVICEMOUNTED "$BACKUPPATH"
-			exitError $RC_MISC_ERROR
+		if [[ -n $lsblkResult ]]; then
+			local di=($(deviceInfo /dev/$lsblkResult))
+			logItem "di: $di"
+			if [[ "$BOOT_DEVICE" == "${di[0]}" ]]; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_DEVICEMOUNTED "$BACKUPPATH"
+				exitError $RC_MISC_ERROR
+			fi
 		fi
 	fi
 
-	if (( $PARTITIONBASED_BACKUP )) && [[ -n $MOUNTPATHS_TO_BACKUP ]]; then
+	if (( $PARTITIONBASED_BACKUP )) && [[ -n $MOUNTPOINTS_TO_BACKUP ]]; then
 
 		local errorFound=0
-		for mountPath in ${MOUNTPATHS_TO_BACKUP[@]}; do
+		for mountPath in ${MOUNTPOINTS_TO_BACKUP[@]}; do
 
 			if ! grep -Eq "^(/[^/ ]*)+/?$" <<< "$mountPath"; then
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_INVALID "$mountPath"
@@ -7984,6 +7989,9 @@ function restorePartitionBasedBackup() {
 	fi
 
 	if (( PARTITIONBASED_BACKUP )); then
+
+		# local partitions
+		
 		if [[ "${PARTITIONS_TO_RESTORE}" == "$PARTITIONS_TO_BACKUP_ALL" ]]; then
 			local all="$(getMessage $MSG_ANSWER_ALL)"
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORING_PARTITIONS "$all" "$RESTORE_DEVICE"
@@ -7999,6 +8007,22 @@ function restorePartitionBasedBackup() {
 		if (( $NO_YES_QUESTION )); then
 			echo "Y${NL}"
 		fi
+
+		# external mountpoints
+
+		if [[ -n "${PARTITIONS_TO_RESTORE}" ]]; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORING_MOUNTPOINTS "\"$MOUNTPOINTS_TO_RESTORE\"" "$RESTORE_DEVICE"
+
+			if ! askYesNo; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORE_ABORTED
+				exitError $RC_RESTORE_FAILED
+			fi
+
+			if (( $NO_YES_QUESTION )); then
+				echo "Y${NL}"
+			fi
+		fi
+
 	fi
 
 	initRestoreVariables
@@ -8008,7 +8032,7 @@ function restorePartitionBasedBackup() {
 		RESTOREFILE="$RESTOREFILE/"
 	fi
 
-	MNT_POINT="$TEMPORARY_MOUNTPOINT_ROOT/${MYNAME}"
+	MNT_POINT="$TEMPORARY_MOUNTPOINT_ROOT"
 
 	if isMounted "$MNT_POINT"; then
 		logItem "$MNT_POINT mounted - unmouting"
@@ -8021,7 +8045,7 @@ function restorePartitionBasedBackup() {
 	logItem "Creating mountpoint $MNT_POINT"
 	mkdir -p $MNT_POINT
 
-	logItem "Mount:$NL$(mount)"
+	# handle partitions
 
 	local partitionBackupFile
 	local partitionsToRestore=(${PARTITIONS_TO_RESTORE[@]})
@@ -8040,6 +8064,19 @@ function restorePartitionBasedBackup() {
 	if ! containsElement "1" "${partitionsRestored[@]}" || ! containsElement "2" "${partitionsRestored[@]}"; then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_PARTITION_RESTORE_NO_BOOT_POSSIBLE 
 	fi
+
+	# handle external mountpoints @TBD@
+	
+	local mountpoint
+	local mountpointsToRestore=(${MOUNTPOINTS_TO_RESTORE[@]})
+
+	logItem "Mountpoints to restore: ${mountpointsToRestore[@]}"
+
+	for mountpoint in "${mountpointsToRestore[@]}"; do
+		local mountpointDir="$(decodeMountpoint mountpoint)"
+		logItem "Decoded dir: mountpointDir"
+		restorePartitionBasedMountpoints "{RESTOREFILE}${mountpointDir}"
+	done
 
 	updateUUIDs
 
@@ -8531,10 +8568,10 @@ function doitRestore() {
 		exitError $RC_ENVIRONMENT_ERROR
 	fi
 
-	if (( $PARTITIONBASED_BACKUP )) && [[ -n $MOUNTPATHS_TO_RESTORE ]]; then
+	if (( $PARTITIONBASED_BACKUP )) && [[ -n $MOUNTPOINTS_TO_RESTORE ]]; then
 
 		local errorFound=0
-		for mountPath in ${MOUNTPATHS_TO_RESTORE[@]}; do
+		for mountPath in ${MOUNTPOINTS_TO_RESTORE[@]}; do
 
 			if ! grep -Eq "^(/[^/ ]*)+/?$" <<< "$mountPath"; then
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_INVALID "$mountPath"
@@ -10007,8 +10044,8 @@ while (( "$#" )); do
 	-X)
 	  o="$(checkOptionParameter "$1" "$2")"
 	  (( $? )) && exitError $RC_PARAMETER_ERROR
-	  MOUNTPATHS_TO_BACKUP="$o"; shift 2
-	  MOUNTPATHS_TO_RESTORE=$MOUNTPATHS_TO_BACKUP
+	  MOUNTPOINTS_TO_BACKUP="$o"; shift 2
+	  MOUNTPOINTS_TO_RESTORE=$MOUNTPOINTS_TO_BACKUP
 	  ;;
 
 	-y|-y[-+])
