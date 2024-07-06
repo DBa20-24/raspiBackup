@@ -1966,8 +1966,8 @@ MSG_PARTITION_RESTORE_NO_BOOT_POSSIBLE=304
 MSG_EN[$MSG_PARTITION_RESTORE_NO_BOOT_POSSIBLE]="RBK0303W: OS partitions not restored. System may not boot."
 MSG_DE[$MSG_PARTITION_RESTORE_NO_BOOT_POSSIBLE]="RBK0303W: OS Partitionen nicht zurückgespielt. Das System könnte nicht booten."
 MSG_RESTORING_PARTITIONS=305
-MSG_EN[$MSG_RESTORING_PARTITIONS]="RBK0305W: Restoring %s partitions to %s."
-MSG_DE[$MSG_RESTORING_PARTITIONS]="RBK0305W: %s Partitionen werden auf %s zurüchgespielt."
+MSG_EN[$MSG_RESTORING_PARTITIONS]="RBK0305W: Restoring partitions %s to %s."
+MSG_DE[$MSG_RESTORING_PARTITIONS]="RBK0305W: Partitionen %s werden auf %s zurüchgespielt."
 MSG_ANSWER_ALL=306
 MSG_EN[$MSG_ANSWER_ALL]="all"
 MSG_DE[$MSG_ANSWER_ALL]="Alle"
@@ -1990,8 +1990,20 @@ MSG_PROCESSED_EXTERNAL_MOUNTPOINT=312
 MSG_EN[$MSG_PROCESSED_EXTERNAL_MOUNTPOINT]="RBK0312I: External mointpoint %s was saved."
 MSG_DE[$MSG_PROCESSED_EXTERNAL_MOUNTPOINT]="RBK0312I: Externer Mountpoint %s wurde gesichert."
 MSG_RESTORING_MOUNTPOINTS=313
-MSG_EN[$MSG_RESTORING_MOUNTPOINTS]="RBK0313W: Restoring %s mointpoints to %s."
-MSG_DE[$MSG_RESTORING_MOUNTPOINTS]="RBK0313W: %s Mountpoints werden auf %s zurüchgespielt."
+MSG_EN[$MSG_RESTORING_MOUNTPOINTS]="RBK0313W: Restoring mointpoints %s."
+MSG_DE[$MSG_RESTORING_MOUNTPOINTS]="RBK0313W: Mountpoints %s werden zurüchgespielt."
+MSG_MOUNTPOINT_BACKUP_NOTFOUND=314
+MSG_EN[$MSG_MOUNTPOINT_BACKUP_NOTFOUND]="RBK0314E: Backup for mountpoint %s not found in %s."
+MSG_DE[$MSG_MOUNTPOINT_BACKUP_NOTFOUND]="RBK0314E: Backup für Mountpoints %s nicht in %s gefunden."
+MSG_RESTORING_MOUNTPOINT=315
+MSG_EN[$MSG_RESTORING_MOUNTPOINT]="RBK0315I: Restoring mointpoint %s."
+MSG_DE[$MSG_RESTORING_MOUNTPOINT]="RBK0315I: Mountpoint %s wird zurüchgespielt."
+MSG_RESTORING_MOUNTPOINT_DONE=316
+MSG_EN[$MSG_RESTORING_MOUNTPOINT_DONE]="RBK0316I: Restore of mountpoint %s finished."
+MSG_DE[$MSG_RESTORING_MOUNTPOINT_DONE]="RBK0316I: Zurückspielen des Mountpoints %s beendet."
+MSG_RESTORE_PROGRAM_ERROR=317
+MSG_EN[$MSG_RESTORE_PROGRAM_ERROR]="RBK0317E: Restore for type %s failed with RC %s."
+MSG_DE[$MSG_RESTORE_PROGRAM_ERROR]="RBK0317E: Restore des Typs %s beendete sich mit RC %s."
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -8011,7 +8023,7 @@ function restorePartitionBasedBackup() {
 		# external mountpoints
 
 		if [[ -n "${PARTITIONS_TO_RESTORE}" ]]; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORING_MOUNTPOINTS "\"$MOUNTPOINTS_TO_RESTORE\"" "$RESTORE_DEVICE"
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORING_MOUNTPOINTS "\"$MOUNTPOINTS_TO_RESTORE\""
 
 			if ! askYesNo; then
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORE_ABORTED
@@ -8065,17 +8077,45 @@ function restorePartitionBasedBackup() {
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_PARTITION_RESTORE_NO_BOOT_POSSIBLE 
 	fi
 
-	# handle external mountpoints @TBD@
+	# handle external mountpoints
 	
 	local mountpoint
 	local mountpointsToRestore=(${MOUNTPOINTS_TO_RESTORE[@]})
 
 	logItem "Mountpoints to restore: ${mountpointsToRestore[@]}"
 
+	# check if there exist backups for mountpoints
+
 	for mountpoint in "${mountpointsToRestore[@]}"; do
-		local mountpointDir="$(decodeMountpoint mountpoint)"
-		logItem "Decoded dir: mountpointDir"
-		restorePartitionBasedMountpoints "{RESTOREFILE}${mountpointDir}"
+		logItem "Checking mountpoint $mountpoint"
+		if [[ ! -d $mountpoint ]]; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_FOUND $mountpoint
+			exitError $RC_EXTERNALMOUNT_ERROR
+		fi
+
+		logItem "Checking whether mountpoint $mountpoint has mounted partition"
+		if ! isMounted $mountpoint; then
+			logItem "Checking mountpoint $mountpoint"
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_MOUNTED $mountpoint
+			exitError $RC_EXTERNALMOUNT_ERROR
+		fi
+		
+		local mountpointDir="$(encodeMountpoint $mountpoint)"
+		logItem "Encoded dir: $mountpointDir"
+
+		logItem "Checking whether backup $mountpointDir for $mountpoint exists in backup"
+		if [[ ! -d ${RESTOREFILE}/${mountpointDir} ]]; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_MOUNTPOINT_BACKUP_NOTFOUND "$mountpoint" "$RESTOREFILE"
+			exitError $RC_EXTERNALMOUNT_ERROR			
+		fi
+
+	done
+
+	# restore mountpoints
+
+	for mountpoint in "${mountpointsToRestore[@]}"; do
+		logItem "Restoring mountpoint $mountpoint"
+		restorePartitionBasedMountpoint "$RESTOREFILE" "$mountpoint"
 	done
 
 	updateUUIDs
@@ -8326,6 +8366,74 @@ function makeFilesystemAndLabel() { # partition filesystem label
 
 }
 
+function restorePartitionBasedMountpoint() { # restorefile mountpoint
+
+	logEntry "$1 $2"
+
+	rc=0
+	local verbose zip cmd
+
+	local mountpoint="$2"
+	local mountpointDir="$(encodeMountpoint $mountpoint)"
+
+	local restoreDir="$1/$mountpointDir"
+
+	writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORING_MOUNTPOINT "$mountpoint"
+
+	(( $VERBOSE )) && verbose="v" || verbose=""
+
+	logItem "Backuptype: $BACKUPTYPE"
+
+	rc=$RC_NATIVE_BACKUP_FAILED
+
+	case $BACKUPTYPE in
+
+		$BACKUPTYPE_TAR|$BACKUPTYPE_TGZ)
+			local archiveFlags=""
+
+			local archiveFlags="--same-owner --same-permissions --numeric-owner ${TAR_RESTORE_ADDITIONAL_OPTIONS}"	
+
+			if ! pushd "$mointpoint" &>>"$LOG_FILE"; then
+				assertionFailed $LINENO "push to $mountpoint failed"
+			fi
+			[[ "$BACKUPTYPE" == "$BACKUPTYPE_TGZ" ]] && zip="z" || zip=""
+			cmd="tar ${archiveFlags} -x${verbose}${zip}f \"$restoreDir\""
+
+			if (( $PROGRESS && $INTERACTIVE )); then
+				cmd="pv -f $restoreFile | $cmd -"
+			fi
+			executeTar "$cmd"
+			rc=$?
+			popd &>>"$LOG_FILE"
+			;;
+
+		$BACKUPTYPE_RSYNC)
+			local archiveFlags="aH"						# -a <=> -rlptgoD, H = preserve hardlinks
+			cmdParms="--numeric-ids -${archiveFlags}X$verbose \"$restoreDir/\" $mountpoint"
+			if (( $PROGRESS && $INTERACTIVE )); then
+				cmd="rsync --info=progress2 $cmdParms"
+			else
+				cmd="rsync $cmdParms"
+			fi
+			executeRsync "$cmd"
+			rc=$?
+			;;
+
+		*)  logItem "Invalid backup type $BACKUPTYPE found"
+			assertionFailed $LINENO "Invalid backup type $BACKUPTYPE detected"
+			;;
+
+	esac
+
+	if [[ $rc != 0 ]]; then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORE_PROGRAM_ERROR $BACKUPTYPE $rc
+		exitError $RC_NATIVE_RESTORE_FAILED
+	fi
+
+	writeToConsole $MSG_LEVEL_DETAILED $MSG_RESTORING_MOUNTPOINT_DONE "$mountpoint"
+
+}
+
 function restorePartitionBasedPartition() { # restorefile
 
 	logEntry "$1"
@@ -8385,12 +8493,9 @@ function restorePartitionBasedPartition() { # restorefile
 
 			case $BACKUPTYPE in
 
+# @TBD@
 				$BACKUPTYPE_TAR|$BACKUPTYPE_TGZ)
-					local archiveFlags=""
-
-					if [[ -n $fatSize  ]]; then
-						local archiveFlags="--same-owner --same-permissions --numeric-owner ${TAR_RESTORE_ADDITIONAL_OPTIONS}"	# fat32 doesn't know about this
-					fi
+					local archiveFlags="--same-owner --same-permissions --numeric-owner ${TAR_RESTORE_ADDITIONAL_OPTIONS}"	# fat32 doesn't know about this
 
 					if ! pushd "$MNT_POINT" &>>"$LOG_FILE"; then
 						assertionFailed $LINENO "push to $MNT_POINT failed"
@@ -8408,7 +8513,6 @@ function restorePartitionBasedPartition() { # restorefile
 
 				$BACKUPTYPE_RSYNC)
 					local archiveFlags="aH"						# -a <=> -rlptgoD, H = preserve hardlinks
-					[[ -n $fatSize  ]] && archiveFlags="rltD"	# no Hopg flags for fat fs
 					cmdParms="--numeric-ids -${archiveFlags}X$verbose \"$restoreFile/\" $MNT_POINT"
 					if (( $PROGRESS && $INTERACTIVE )); then
 						cmd="rsync --info=progress2 $cmdParms"
@@ -8426,8 +8530,8 @@ function restorePartitionBasedPartition() { # restorefile
 			esac
 
 			if [[ $rc != 0 ]]; then
-				writeToConsole $MSG_LEVEL_MINIMAL $MSG_BACKUP_PROGRAM_ERROR $BACKUPTYPE $rc
-				exitError $RC_NATIVE_BACKUP_FAILED
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORE_PROGRAM_ERROR $BACKUPTYPE $rc
+				exitError $RC_NATIVE_RESTORE_FAILED
 			fi
 
 			sleep 1s					# otherwise umount fails
