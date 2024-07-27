@@ -2004,6 +2004,9 @@ MSG_DE[$MSG_RESTORING_MOUNTPOINT_DONE]="RBK0316I: Zurückspielen des Mountpoints
 MSG_RESTORE_PROGRAM_ERROR=317
 MSG_EN[$MSG_RESTORE_PROGRAM_ERROR]="RBK0317E: Restore for type %s failed with RC %s."
 MSG_DE[$MSG_RESTORE_PROGRAM_ERROR]="RBK0317E: Restore des Typs %s beendete sich mit RC %s."
+MSG_MOUNTPOINT_BACKUP_REQUIRES_PARTITIONED_BACKUP=318
+MSG_EN[$MSG_MOUNTPOINT_BACKUP_REQUIRES_PARTITIONED_BACKUP]="RBK0318E: Mountpoint backup is available only in partition oriented mode."
+MSG_DE[$MSG_MOUNTPOINT_BACKUP_REQUIRES_PARTITIONED_BACKUP]="RBK0318E: Mountpoint Backup ist nur im partitionsorientierten Backupmdous verfügbar."
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -2738,8 +2741,6 @@ function logOptions() { # option state
 	logItem "APPEND_LOG=$APPEND_LOG"
 	logItem "APPEND_LOG_OPTION=$APPEND_LOG_OPTION"
 	logItem "BACKUPPATH=$BACKUPPATH"
-	logItem "MOUNTPOINTS_TO_BACKUP=$MOUNTPOINTS_TO_BACKUP"
-	logItem "MOUNTPOINTS_TO_RESTORE=$MOUNTPOINTS_TO_RESTORE"
 	logItem "BACKUPTYPE=$BACKUPTYPE"
 	logItem "BEFORE_STOPSERVICES=$BEFORE_STOPSERVICES"
 	logItem "BOOT_DEVICE=$BOOT_DEVICE"
@@ -2774,6 +2775,8 @@ function logOptions() { # option state
  	logItem "LOG_OUTPUT=$LOG_OUTPUT"
 	logItem "MAIL_ON_ERROR_ONLY=$MAIL_ON_ERROR_ONLY"
 	logItem "MAIL_PROGRAM=$EMAIL_PROGRAM"
+	logItem "MOUNTPOINTS_TO_BACKUP=$MOUNTPOINTS_TO_BACKUP"
+	logItem "MOUNTPOINTS_TO_RESTORE=$MOUNTPOINTS_TO_RESTORE"
 	logItem "MSG_LEVEL=$MSG_LEVEL"
 	logItem "NOTIFY_START=$NOTIFY_START"
 	logItem "NOTIFY_UPDATE=$NOTIFY_UPDATE"
@@ -3988,6 +3991,7 @@ function readConfigParameters() {
 
 	for file in ${files[@]}; do
 		if [[ -e $file ]]; then
+			[[ $file == $HOME_CONFIG_FILE && $HOME_CONFIG_FILE == $CURRENTDIR_CONFIG_FILE ]] && continue
 			local attrs="$(stat -c %a $file)"
 			if (( ( 0$attrs & 077 ) != 0 )); then
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNPROTECTED_PROPERTIESFILE $file
@@ -5363,7 +5367,7 @@ function cleanupBackup() { # trap
 	logItem "rc: $rc"
 
 	if (( $PARTITIONBASED_BACKUP )); then
-		umountSDPartitions "$TEMPORARY_MOUNTPOINT_ROOT"
+		umountPartitions "$TEMPORARY_MOUNTPOINT_ROOT"
 	fi
 
 	if (( $PRE_BACKUP_EXTENSION_CALLED )); then
@@ -5782,7 +5786,7 @@ function backupTar() {
 	(( $VERBOSE )) && verbose="-v" || verbose=""
 	[[ $BACKUPTYPE == $BACKUPTYPE_TGZ ]] && zip="-z" || zip=""
 
-	[[ $1 =~ [0-9]+ ]] && partitionBackup=1
+	[[ $1 =~ ^[0-9]+$ ]] && partitionBackup=1
 
 	if (( $PARTITIONBASED_BACKUP )); then
 		if (( partitionBackup )); then
@@ -5947,14 +5951,14 @@ function backupRsync() { # partition number (for partition based backup), mountp
 	local verbose partition target source excludeRoot cmd cmdParms excludeMeta
 	local partitionBackup=0 mountpointName
 
-	logEntry
+	logEntry "$1"
 
 	(( $PROGRESS )) && VERBOSE=0
 
 	verbose="--info=NAME0"
 	(( $VERBOSE )) && verbose="-v"
 
-	[[ $1 =~ [0-9]+ ]] && partitionBackup=1
+	[[ $1 =~ ^[0-9]+$ ]] && partitionBackup=1
 
 	logCommand "ls $BACKUPTARGET_ROOT"
 
@@ -6691,7 +6695,7 @@ function backup() {
 
 }
 
-function mountSDPartitions() { # sourcePath
+function mountPartitions() { # sourcePath
 
 	local partition partitionName
 	logEntry
@@ -6701,7 +6705,7 @@ function mountSDPartitions() { # sourcePath
 		for partition in "${PARTITIONS_TO_BACKUP[@]}"; do
 			partitionName="$BOOT_PARTITION_PREFIX$partition"
 			logItem "mkdir $1/$partitionName"
-			mkdir "$1/$partitionName" &>>"$LOG_FILE"
+			mkdir -p "$1/$partitionName" &>>"$LOG_FILE"
 			logItem "mount /dev/$partitionName to $1/$partitionName"
 			mountAndCheck "/dev/$partitionName" "$1/$partitionName"
 		done
@@ -6710,26 +6714,7 @@ function mountSDPartitions() { # sourcePath
 	logExit
 }
 
-function mountMountpoints() { # sourcePath
-
-	local mountpoint mountpointName
-	logEntry
-
-	if (( ! $FAKE )); then
-		logItem "BEFORE: mount $(mount)"
-		for mountpoint in "${MOUNTPOINTS_TO_BACKUP[@]}"; do
-			mountpointName="$BOOT_PARTITION_PREFIX$partition"
-			logItem "mkdir $1/$mountpointName"
-			mkdir "$1/$mountpointName" &>>"$LOG_FILE"
-			logItem "mount $mountpoint to $1/$mountpointName"
-			mountAndCheck "/dev/$partitionName" "$1/$mountpointName"
-		done
-		logItem "AFTER: mount $(mount)"
-	fi
-	logExit
-}
-
-function umountSDPartitions() { # sourcePath
+function umountPartitions() { # sourcePath
 
 	local partitionName partition
 	logEntry
@@ -6766,7 +6751,7 @@ function backupPartitions() {
 	fi
 
 	if [[ $BACKUPTYPE == $BACKUPTYPE_RSYNC || $BACKUPTYPE == $BACKUPTYPE_TAR || $BACKUPTYPE == $BACKUPTYPE_TGZ ]]; then
-		mountSDPartitions "$TEMPORARY_MOUNTPOINT_ROOT"
+		mountPartitions "$TEMPORARY_MOUNTPOINT_ROOT"
 	fi
 
 	for partition in "${PARTITIONS_TO_BACKUP[@]}"; do
@@ -6809,7 +6794,7 @@ function backupPartitions() {
 	done
 
 	if [[ $BACKUPTYPE == $BACKUPTYPE_RSYNC || $BACKUPTYPE == $BACKUPTYPE_TAR || $BACKUPTYPE == $BACKUPTYPE_TGZ ]]; then
-		umountSDPartitions "$TEMPORARY_MOUNTPOINT_ROOT"
+		umountPartitions "$TEMPORARY_MOUNTPOINT_ROOT"
 	fi
 
 	logExit "$rc"
@@ -7643,6 +7628,11 @@ function doitBackup() {
 			fi
 		fi
 	fi
+
+	if (( ! $PARTITIONBASED_BACKUP )) && [[ -n $MOUNTPOINTS_TO_BACKUP ]]; then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MOUNTPOINT_BACKUP_REQUIRES_PARTITIONED_BACKUP
+		exitError $RC_PARAMETER_ERROR
+	fi		
 
 	if (( $PARTITIONBASED_BACKUP )) && [[ -n $MOUNTPOINTS_TO_BACKUP ]]; then
 
