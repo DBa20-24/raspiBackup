@@ -5107,6 +5107,7 @@ function cleanup() { # trap
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_TEMPMOVE_FAILED $rc
 				CLEANUP_RC=$RC_TEMPMOVE_FAILED
 			else
+				rmdir "$BACKUPTARGET_TEMP_ROOT" &>> $LOG_FILE
 				BACKUPTARGET_DIR="$BACKUPTARGET_FINAL_DIR"
 				if (( \
 					( $SMART_RECYCLE && ! $SMART_RECYCLE_DRYRUN ) \
