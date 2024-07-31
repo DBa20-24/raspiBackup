@@ -2010,6 +2010,10 @@ MSG_DE[$MSG_MOUNTPOINT_BACKUP_REQUIRES_PARTITIONED_BACKUP]="RBK0318E: Mountpoint
 MSG_UPDATING_UUIDS=319
 MSG_EN[$MSG_UPDATING_UUIDS]="RBK0319I: Generating new UUIDs."
 MSG_DE[$MSG_UPDATING_UUIDS]="RBK0319I: Neue UUIDs werden generiert."
+MSG_REMOVING_BACKUP_NO_FILE=320
+MSG_EN[$MSG_REMOVING_BACKUP_NO_FILE]="RBK0320I: Removing incomplete backup. This may take some time. Please be patient."
+MSG_DE[$MSG_REMOVING_BACKUP_NO_FILE]="RBK0320I: Unvollständiges Backup wird gelöscht. Das kann etwas dauern. Bitte Geduld."
+
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -4841,11 +4845,19 @@ function cleanupBackupDirectory() {
 
 	if [[ -d "$BACKUPTARGET_TEMP_ROOT" ]]; then
 		if [[ -n $(ls "$BACKUPTARGET_TEMP_ROOT") ]]; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_REMOVING_BACKUP "$BACKUPTARGET_TEMP_ROOT"
+			if [[ $MSG_LEVEL == $MSG_LEVEL_DETAILED ]]; then
+				writeToConsole $MSG_LEVEL_DETAILED $MSG_REMOVING_BACKUP "$BACKUPTARGET_TEMP_ROOT"
+			else
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_REMOVING_BACKUP_NO_FILE
+			fi
 			rm -rfd $BACKUPTARGET_TEMP_ROOT &>> $LOG_FILE # delete temp backupdir with all incomplete contents
 			local rmrc=$?
 			if (( $rmrc != 0 )); then
-				writeToConsole $MSG_LEVEL_MINIMAL $MSG_REMOVING_BACKUP_FAILED "$BACKUPTARGET_TEMP_ROOT" "$rmrc"
+				if [[ $MSG_LEVEL == $MSG_LEVEL_DETAILED ]]; then
+					writeToConsole $MSG_LEVEL_MINIMAL $MSG_REMOVING_BACKUP_FAILED "$BACKUPTARGET_TEMP_ROOT" "$rmrc"
+				else
+					writeToConsole $MSG_LEVEL_MINIMAL $MSG_REMOVING_BACKUP_NO_FILE
+				fi
 			fi
 		fi
 	fi
@@ -5818,7 +5830,7 @@ function backupTar() {
 		target="\"$BACKUPTARGET_FILE\""
 	fi
 
-	writeToConsole $MSG_LEVEL_MINIMAL $MSG_MAIN_BACKUP_PROGRESSING $BACKUPTYPE "${target//\\/}"
+	writeToConsole $MSG_LEVEL_DETAILED $MSG_MAIN_BACKUP_PROGRESSING $BACKUPTYPE "${target//\\/}"
 
 	local log_file="${LOG_FILE/\//}" # remove leading /
 	local msg_file="${MSG_FILE/\//}" # remove leading /
@@ -6015,7 +6027,7 @@ function backupRsync() { # partition number (for partition based backup), mountp
 		writeToConsole $MSG_LEVEL_DETAILED $MSG_HARDLINK_DIRECTORY_USED "$lastBackupDir"
 	fi
 
-	writeToConsole $MSG_LEVEL_MINIMAL $MSG_MAIN_BACKUP_PROGRESSING $BACKUPTYPE "${target//\\/}"
+	writeToConsole $MSG_LEVEL_DETAILED $MSG_MAIN_BACKUP_PROGRESSING $BACKUPTYPE "${target//\\/}"
 
 	local log_file="${LOG_FILE/\//}" # remove leading /
 	local msg_file="${MSG_FILE/\//}" # remove leading /
