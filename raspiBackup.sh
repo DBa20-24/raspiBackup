@@ -2007,6 +2007,9 @@ MSG_DE[$MSG_RESTORE_PROGRAM_ERROR]="RBK0317E: Restore des Typs %s beendete sich 
 MSG_MOUNTPOINT_BACKUP_REQUIRES_PARTITIONED_BACKUP=318
 MSG_EN[$MSG_MOUNTPOINT_BACKUP_REQUIRES_PARTITIONED_BACKUP]="RBK0318E: Mountpoint backup is available only in partition oriented mode."
 MSG_DE[$MSG_MOUNTPOINT_BACKUP_REQUIRES_PARTITIONED_BACKUP]="RBK0318E: Mountpoint Backup ist nur im partitionsorientierten Backupmdous verfügbar."
+MSG_UPDATING_UUIDS=319
+MSG_EN[$MSG_UPDATING_UUIDS]="RBK0319I: Generating new UUIDs."
+MSG_DE[$MSG_UPDATING_UUIDS]="RBK0319I: Neue UUIDs werden generiert."
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -3989,12 +3992,16 @@ function readConfigParameters() {
 	local file
 	local files=($ETC_CONFIG_FILE $HOME_CONFIG_FILE $CURRENTDIR_CONFIG_FILE)
 
+	local warnedFiles=""
+
 	for file in ${files[@]}; do
 		if [[ -e $file ]]; then
-			[[ $file == $HOME_CONFIG_FILE && $HOME_CONFIG_FILE == $CURRENTDIR_CONFIG_FILE ]] && continue
 			local attrs="$(stat -c %a $file)"
 			if (( ( 0$attrs & 077 ) != 0 )); then
-				writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNPROTECTED_PROPERTIESFILE $file
+				if ! grep -q $file <<< "$warnedFiles"; then
+					writeToConsole $MSG_LEVEL_MINIMAL $MSG_UNPROTECTED_PROPERTIESFILE $file
+					warnedFiles="$warnedFiles $file"
+				fi
 			fi
 		fi
 	done
@@ -5879,6 +5886,7 @@ function waitForPartitionDefsChanged {
 function updateUUIDs() {
 	logEntry
 	if (( $UPDATE_UUIDS )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_UPDATING_UUIDS
 		logItem "Old blkid"
 		logCommand "blkid"
 		updatePartUUID
