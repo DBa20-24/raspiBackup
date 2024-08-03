@@ -8627,7 +8627,7 @@ function doitRestore() {
 	logItem "Checking for partitionbasedbackup in $RESTOREFILE/*"
 	logCommand "ls -1 $RESTOREFILE*"
 
-	if  ls -1 "$RESTOREFILE"* | egrep "^(sd[a-z]([0-9]+)|mmcblk[0-9]+p[0-9]+|nvme[0-9]+n[0-9]+p[0-9]+)$" &>>"$LOG_FILE" ; then
+	if  ls -1 "$RESTOREFILE"* | egrep "^(sd[a-z]([0-9]+)|mmcblk[0-9]+p[0-9]+|nvme[0-9]+n[0-9]+p[0-9]+)(\.(tar|tgz))?$" &>>"$LOG_FILE" ; then
 		PARTITIONBASED_BACKUP=1
 	else
 		PARTITIONBASED_BACKUP=0

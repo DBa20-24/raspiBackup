@@ -2480,14 +2480,14 @@ function systemd_install_execute() {
 
 	writeToConsole $MSG_INSTALLING_SYSTEMD_TEMPLATE "$SYSTEMD_SERVICE_ABS_FILE"
 	echo "$SYSTEMD_SERVICE" >"$SYSTEMD_SERVICE_ABS_FILE"
-	if ! chmod 755 $SYSTEMD_SERVICE_ABS_FILE &>>$LOG_FILE; then
+	if ! chmod 644 $SYSTEMD_SERVICE_ABS_FILE &>>$LOG_FILE; then
 		unrecoverableError $MSG_CHMOD_FAILED "$SYSTEMD_SERVICE_ABS_FILE"
 		logExit
 		return
 	fi
 	writeToConsole $MSG_INSTALLING_SYSTEMD_TEMPLATE "$SYSTEMD_TIMER_ABS_FILE"
 	echo "$SYSTEMD_TIMER" >"$SYSTEMD_TIMER_ABS_FILE"
-	if ! chmod 755 $SYSTEMD_TIMER_ABS_FILE &>>$LOG_FILE; then
+	if ! chmod 644 $SYSTEMD_TIMER_ABS_FILE &>>$LOG_FILE; then
 		unrecoverableError $MSG_CHMOD_FAILED "$SYSTEMD_TIMER_ABS_FILE"
 		logExit
 		return
@@ -2874,7 +2874,7 @@ function cleanup() {
 		rc=127
 	fi
 
-	chown "$CALLING_USER:$CALLING_USER" "$LOG_FILE" &> $LOG_FILE
+	chown "$CALLING_USER:$CALLING_USER" "$LOG_FILE" &>> $LOG_FILE
 
 	exit $rc
 }
