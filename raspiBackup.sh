@@ -2266,8 +2266,10 @@ function logFinish() {
 			logItem "Logfiles used: $LOG_FILE and $MSG_FILE"
 		fi
 
-		chown "$CALLING_USER:$CALLING_USER" "$DEST_LOGFILE" &>>$FINISH_LOG_FILE # make sure logfile is owned by caller
-		chown "$CALLING_USER:$CALLING_USER" "$DEST_MSGFILE" &>>$FINISH_LOG_FILE # make sure msgfile is owned by caller
+		if [[ $LOG_OUTPUT == $LOG_OUTPUT_HOME ]]; then
+			chown "$CALLING_USER:$CALLING_USER" "$DEST_LOGFILE" &>>$FINISH_LOG_FILE # make sure logfile is owned by caller
+			chown "$CALLING_USER:$CALLING_USER" "$DEST_MSGFILE" &>>$FINISH_LOG_FILE # make sure msgfile is owned by caller
+		fi
 
 		if [[ -e $FINISH_LOG_FILE ]]; then					# append optional final messages
 			logCommand "cat $FINISH_LOG_FILE"
