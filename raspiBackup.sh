@@ -3093,7 +3093,7 @@ function isSpecialBlockDevice() { # either device (mmcblk, sd) or device name (/
 	logEntry "$1"
 
 	local rc
-	
+
 	[[ $1 =~ mmcblk|loop|nvme ]]
 	rc=$?
 
@@ -3107,7 +3107,7 @@ function makePartition() { # either device (mmcblk0, sda) or device name (/dev/m
 	logEntry "$1 $2"
 
 	local result="$1"
-	
+
 	if isSpecialBlockDevice "$1"; then
 		result="${result}p"
 	fi
@@ -3119,7 +3119,7 @@ function makePartition() { # either device (mmcblk0, sda) or device name (/dev/m
 	logExit "$result"
 
 	echo "$result"
-	
+
 }
 
 # Input:
@@ -3135,7 +3135,7 @@ function getPartitionPrefix() { # device
 
 	logEntry "$1"
 	local pref="$1"
-	
+
 	if isSpecialBlockDevice "$1"; then
 		pref="${1}p"
 	fi
@@ -4301,7 +4301,7 @@ function createResizedSFDisk() { # sfdisk_source_filename targetDeviceSize sfdis
 			(( oldPartitionSize = size * sectorSize ))
 
 			logItem "OldPartitionSize: $oldPartitionSize ($(bytesToHuman $oldPartitionSize)))"
-			
+
 			if (( sourceDeviceSize > targetDeviceSize )); then
 				[[ -v RESIZE_FSDISK ]] && logItem "newSize = ( $size - ( $sourceDeviceSize - $targetDeviceSize ) / $sectorSize )"
 				(( newSize = ( size - ( sourceDeviceSize - targetDeviceSize ) / sectorSize ) ))
@@ -6000,32 +6000,35 @@ function backupRsync() { # partition number (for partition based backup), mountp
 			excludeRoot=""
 		fi
 
-		lastBackupDir=$(find "$BACKUPTARGET_ROOT" -maxdepth 1 -type d -name "*-$BACKUPTYPE-*" ! -name $BACKUPFILE 2>>/dev/null | sort | tail -n 1)			
-
 	else
 		target="\"${BACKUPTARGET_DIR}\""
 		source="/"
 
 		bootPartitionBackup
-		lastBackupDir=$(find "$BACKUPTARGET_ROOT" -maxdepth 1 -type d -name "*-$BACKUPTYPE-*" ! -name $BACKUPFILE 2>>/dev/null | sort | tail -n 1)
 		excludeRoot=""
 		excludeMeta="--exclude=/$BACKUPFILES_PARTITION_DATE.img --exclude=/$BACKUPFILES_PARTITION_DATE.tmg --exclude=/$BACKUPFILES_PARTITION_DATE.sfdisk --exclude=/$BACKUPFILES_PARTITION_DATE.blkid --exclude=/$BACKUPFILES_PARTITION_DATE.fdisk --exclude=/$BACKUPFILES_PARTITION_DATE.parted --exclude=/$BACKUPFILES_PARTITION_DATE.mbr --exclude=/$MYNAME.log --exclude=/$MYNAME.msg"
 	fi
 
-	logItem "LastBackupDir: $lastBackupDir"
+	lastBackupDir=$(find "$BACKUPTARGET_ROOT" -maxdepth 1 -type d -name "*-$BACKUPTYPE-*" ! -name $BACKUPFILE 2>>/dev/null | sort | tail -n 1)
 
-	LINK_DEST=""
 	if [[ -n "$lastBackupDir" ]]; then
 		if (( partitionBackup )); then
-			LINK_DEST="--link-dest=\"$lastBackupDir\""
-		elif [[ -d $lastBackupDir/$mountpointName ]]; then
-			LINK_DEST="--link-dest=\"$lastBackupDir/${mountpointName}\""
+			if [[ -d $lastBackupDir/$partition ]]; then
+				lastBackupDir="$lastBackupDir/${partition}"
+			fi
+		elif (( mountPoints )); then
+			if [[ -d $lastBackupDir/$mountpointName ]]; then
+				lastBackupDir="$lastBackupDir/${mountpointName}"
+			fi
 		fi
 	fi
 
-	logItem "LinkDest: $LINK_DEST"
+	logItem "LastBackupDir: $lastBackupDir"
 
-	if [[ -n $LINK_DEST ]]; then
+	local LINK_DEST=""
+	if [[ -n $lastBackupDir ]]; then
+		LINK_DEST="--link-dest=\"$lastBackupDir\""
+		logItem "LinkDest: $LINK_DEST"
 		writeToConsole $MSG_LEVEL_DETAILED $MSG_HARDLINK_DIRECTORY_USED "$lastBackupDir"
 	fi
 
@@ -7218,7 +7221,7 @@ function inspect4Backup() {
 		fi
 
 		logItem "bootMountpoint: $bootMountpoint, bootPartition: $bootPartition"
-		
+
 		logItem "Starting root discovery"
 
 		# find root partition
@@ -7662,7 +7665,7 @@ function doitBackup() {
 	if (( ! $PARTITIONBASED_BACKUP )) && [[ -n $MOUNTPOINTS_TO_BACKUP ]]; then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MOUNTPOINT_BACKUP_REQUIRES_PARTITIONED_BACKUP
 		exitError $RC_PARAMETER_ERROR
-	fi		
+	fi
 
 	if (( $PARTITIONBASED_BACKUP )) && [[ -n $MOUNTPOINTS_TO_BACKUP ]]; then
 
@@ -7685,8 +7688,8 @@ function doitBackup() {
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_FOUND "$mountPath"
 				errorFound=1
 				continue
-			fi			
-				
+			fi
+
 			if ! isMounted "$mountPath"; then
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_MOUNTED "$mountPath"
 				errorFound=1
@@ -7889,7 +7892,7 @@ function initRestoreVariables () {
 	fi
 
 	BOOT_PARTITION="$(makePartition "$RESTORE_DEVICE" 1)"
-	
+
 	logItem "BOOT_PARTITION : $BOOT_PARTITION"
 
 	ROOT_PARTITION_DEFINED=1
@@ -8023,7 +8026,7 @@ function restorePartitionBasedBackup() {
 	if (( PARTITIONBASED_BACKUP )); then
 
 		# local partitions
-		
+
 		if [[ "${PARTITIONS_TO_RESTORE}" == "$PARTITIONS_TO_BACKUP_ALL" ]]; then
 			local all="$(getMessage $MSG_ANSWER_ALL)"
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORING_PARTITIONS "$all" "$RESTORE_DEVICE"
@@ -8094,11 +8097,11 @@ function restorePartitionBasedBackup() {
 	done
 
 	if ! containsElement "1" "${partitionsRestored[@]}" || ! containsElement "2" "${partitionsRestored[@]}"; then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_PARTITION_RESTORE_NO_BOOT_POSSIBLE 
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_PARTITION_RESTORE_NO_BOOT_POSSIBLE
 	fi
 
 	# handle external mountpoints
-	
+
 	local mountpoint
 	local mountpointsToRestore=(${MOUNTPOINTS_TO_RESTORE[@]})
 
@@ -8119,14 +8122,14 @@ function restorePartitionBasedBackup() {
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_MOUNTED $mountpoint
 			exitError $RC_EXTERNALMOUNT_ERROR
 		fi
-		
+
 		local mountpointDir="$(encodeMountpoint $mountpoint)"
 		logItem "Encoded dir: $mountpointDir"
 
 		logItem "Checking whether backup $mountpointDir for $mountpoint exists in backup"
 		if [[ ! -d ${RESTOREFILE}/${mountpointDir} ]]; then
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_MOUNTPOINT_BACKUP_NOTFOUND "$mountpoint" "$RESTOREFILE"
-			exitError $RC_EXTERNALMOUNT_ERROR			
+			exitError $RC_EXTERNALMOUNT_ERROR
 		fi
 
 	done
@@ -8411,7 +8414,7 @@ function restorePartitionBasedMountpoint() { # restorefile mountpoint
 		$BACKUPTYPE_TAR|$BACKUPTYPE_TGZ)
 			local archiveFlags=""
 
-			local archiveFlags="--same-owner --same-permissions --numeric-owner ${TAR_RESTORE_ADDITIONAL_OPTIONS}"	
+			local archiveFlags="--same-owner --same-permissions --numeric-owner ${TAR_RESTORE_ADDITIONAL_OPTIONS}"
 
 			if ! pushd "$mointpoint" &>>"$LOG_FILE"; then
 				assertionFailed $LINENO "push to $mountpoint failed"
@@ -8713,8 +8716,8 @@ function doitRestore() {
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_FOUND "$mountPath"
 				errorFound=1
 				continue
-			fi			
-				
+			fi
+
 			if ! isMounted "$mountPath"; then
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_MOUNTED "$mountPath"
 				errorFound=1
@@ -8727,7 +8730,7 @@ function doitRestore() {
 		fi
 	fi
 
-	
+
 	BASE_DIR=$(dirname "$RESTOREFILE")
 	logItem "Basedir: $BASE_DIR"
 	HOSTNAME=$(basename "$RESTOREFILE" | sed -r 's/(.*)-[A-Za-z]+-backup-[0-9]+-[0-9]+.*/\1/')
@@ -9768,7 +9771,7 @@ logEnable
 if (( !INCLUDE_ONLY )); then
 	lockingFramework
 	trapWithArg cleanupStartup SIGINT SIGTERM EXIT
-fi	
+fi
 
 INVOCATIONPARMS=""			# save passed opts for logging
 for (( i=1; i<=$#; i++ )); do
