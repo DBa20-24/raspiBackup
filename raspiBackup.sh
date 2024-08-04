@@ -433,6 +433,7 @@ RC_NOT_SUPPORTED=143
 RC_TEMPMOVE_FAILED=144
 RC_RESIZE_ERROR=145
 RC_EXTERNALMOUNT_ERROR=146
+RC_NO_PARTITIONS_FOUND=147
 
 tty -s
 INTERACTIVE=$((!$?))
@@ -511,11 +512,11 @@ MSG_EN[$MSG_BACKUP_FAILED]="RBK0005E: Backup failed. Check previous error messag
 MSG_DE[$MSG_BACKUP_FAILED]="RBK0005E: Backup fehlerhaft beendet. Siehe vorhergehende Fehlermeldungen."
 MSG_FI[$MSG_BACKUP_FAILED]="RBK0005E: Varmuuskopiointi epäonnistui. Katso lisätiedot edellisistä virheilmoituksista"
 MSG_FR[$MSG_BACKUP_FAILED]="RBK0005E: La sauvegarde a echoué. Consultez les messages d'erreur pour plus d'information"
-MSG_ADJUSTING_WARNING=6
-MSG_EN[$MSG_ADJUSTING_WARNING]="RBK0006W: Target %s with %s is smaller than backup source with %s. root partition will be truncated accordingly. NOTE: Restore may fail if the root partition will become too small."
-MSG_DE[$MSG_ADJUSTING_WARNING]="RBK0006W: Ziel %s mit %s ist kleiner als die Backupquelle mit %s. Die root Partition wird entsprechend verkleinert. HINWEIS: Der Restore kann fehlschlagen wenn sie zu klein wird."
-MSG_FI[$MSG_ADJUSTING_WARNING]="RBK0006W: Kohde %s kooltaan %s on pienempi kuin varmuuskopion lähde kooltaan %s. Juuriosio typistetään sen mukaiseksi. HUOM: Palautus saattaa epäonnistua, jos juuriosiosta tulee liian pieni."
-MSG_FR[$MSG_ADJUSTING_WARNING]="RBK0006W: La cible %s avec %s est plus petite que la source avec  %s. la partition racine sera diminuée en proportion. REMARQUE : La restauration peut échouer si la partition root devient trop petite."
+#MSG_ADJUSTING_WARNING=6
+#MSG_EN[$MSG_ADJUSTING_WARNING]="RBK0006W: Target %s with %s is smaller than backup source with %s. root partition will be truncated accordingly. NOTE: Restore may fail if the root partition will become too small."
+#MSG_DE[$MSG_ADJUSTING_WARNING]="RBK0006W: Ziel %s mit %s ist kleiner als die Backupquelle mit %s. Die root Partition wird entsprechend verkleinert. HINWEIS: Der Restore kann fehlschlagen wenn sie zu klein wird."
+#MSG_FI[$MSG_ADJUSTING_WARNING]="RBK0006W: Kohde %s kooltaan %s on pienempi kuin varmuuskopion lähde kooltaan %s. Juuriosio typistetään sen mukaiseksi. HUOM: Palautus saattaa epäonnistua, jos juuriosiosta tulee liian pieni."
+#MSG_FR[$MSG_ADJUSTING_WARNING]="RBK0006W: La cible %s avec %s est plus petite que la source avec  %s. la partition racine sera diminuée en proportion. REMARQUE : La restauration peut échouer si la partition root devient trop petite."
 MSG_STARTING_SERVICES=7
 MSG_EN[$MSG_STARTING_SERVICES]="RBK0007I: Starting services: '%s'."
 MSG_DE[$MSG_STARTING_SERVICES]="RBK0007I: Services werden gestartet: '%s'."
@@ -571,11 +572,11 @@ MSG_EN[$MSG_BACKUP_OK]="RBK0017I: Backup finished successfully."
 MSG_DE[$MSG_BACKUP_OK]="RBK0017I: Backup erfolgreich beendet."
 MSG_FI[$MSG_BACKUP_OK]="RBK0017I: Varmuuskopiointi suoritettu onnistuneesti."
 MSG_FR[$MSG_BACKUP_OK]="RBK0017I: Sauvegarde terminée avec succès."
-MSG_ADJUSTING_WARNING2=18
-MSG_EN[$MSG_ADJUSTING_WARNING2]="RBK0018W: Target %s with %s is larger than backup source with %s. root partition will be expanded accordingly to use the whole space."
-MSG_DE[$MSG_ADJUSTING_WARNING2]="RBK0018W: Ziel %s mit %s ist größer als die Backupquelle mit %s. Die root Partition wird entsprechend vergrößert um den ganzen Platz zu benutzen."
-MSG_FI[$MSG_ADJUSTING_WARNING2]="RBK0018W: Kohde %s kooltaan %s, on suurempi kuin varmuuskopion lähde kooltaan %s. Juuriosio laajennetaan sen mukaisesti käyttämään koko tila."
-MSG_FR[$MSG_ADJUSTING_WARNING2]="RBK0018W: La cible %s avec %s, est plus grande que la source avec %s. la partition rootfs sera étendue pour utiliser tout l'espace."
+#MSG_ADJUSTING_WARNING2=18
+#MSG_EN[$MSG_ADJUSTING_WARNING2]="RBK0018W: Target %s with %s is larger than backup source with %s. root partition will be expanded accordingly to use the whole space."
+#MSG_DE[$MSG_ADJUSTING_WARNING2]="RBK0018W: Ziel %s mit %s ist größer als die Backupquelle mit %s. Die root Partition wird entsprechend vergrößert um den ganzen Platz zu benutzen."
+#MSG_FI[$MSG_ADJUSTING_WARNING2]="RBK0018W: Kohde %s kooltaan %s, on suurempi kuin varmuuskopion lähde kooltaan %s. Juuriosio laajennetaan sen mukaisesti käyttämään koko tila."
+#MSG_FR[$MSG_ADJUSTING_WARNING2]="RBK0018W: La cible %s avec %s, est plus grande que la source avec %s. la partition rootfs sera étendue pour utiliser tout l'espace."
 MSG_MISSING_START_STOP=19
 MSG_EN[$MSG_MISSING_START_STOP]="RBK0019E: Missing option -a and -o."
 MSG_DE[$MSG_MISSING_START_STOP]="RBK0019E: Option -a und -o nicht angegeben."
@@ -741,11 +742,11 @@ MSG_EN[$MSG_TARGET_REQUIRES_GPT]="RBK0051W: Target %s with %s is larger than 2TB
 MSG_DE[$MSG_TARGET_REQUIRES_GPT]="RBK0051W: Ziel %s mit %s ist größer als 2TB und erfordert gpt statt mbr. Ansonsten werden nur 2TB genutzt."
 MSG_FI[$MSG_TARGET_REQUIRES_GPT]="RBK0051W: Kohde %s kooltaan %s, on suurempi kuin 2Tt ja vaatii mbr:n sijasta gpt:n. Muutoin vain 2Tt voidaan käyttää."
 MSG_FR[$MSG_TARGET_REQUIRES_GPT]="RBK0051W: La cible %s avec %s, est supérieure à 2 To et nécessite GPT au lieu de MBR. Sinon, seuls 2 To seront utilisés."
-MSG_CREATING_PARTITIONS=52
-MSG_EN[$MSG_CREATING_PARTITIONS]="RBK0052I: Creating partitions on %s."
-MSG_DE[$MSG_CREATING_PARTITIONS]="RBK0052I: Partitionen werden auf %s erstellt."
-MSG_FI[$MSG_CREATING_PARTITIONS]="RBK0052I: Luodaan osioita kohteelle %s."
-MSG_FR[$MSG_CREATING_PARTITIONS]="RBK0052I: Les partitions seront créées sur %s."
+#MSG_CREATING_PARTITIONS=52
+#MSG_EN[$MSG_CREATING_PARTITIONS]="RBK0052I: Creating partitions on %s."
+#MSG_DE[$MSG_CREATING_PARTITIONS]="RBK0052I: Partitionen werden auf %s erstellt."
+#MSG_FI[$MSG_CREATING_PARTITIONS]="RBK0052I: Luodaan osioita kohteelle %s."
+#MSG_FR[$MSG_CREATING_PARTITIONS]="RBK0052I: Les partitions seront créées sur %s."
 MSG_RESTORING_FIRST_PARTITION=53
 MSG_EN[$MSG_RESTORING_FIRST_PARTITION]="RBK0053I: Restoring first partition (boot partition) to %s."
 MSG_DE[$MSG_RESTORING_FIRST_PARTITION]="RBK0053I: Erste Partition (Bootpartition) wird auf %s zurückgespielt."
@@ -2013,7 +2014,15 @@ MSG_DE[$MSG_UPDATING_UUIDS]="RBK0319I: Neue UUIDs werden generiert."
 MSG_REMOVING_BACKUP_NO_FILE=320
 MSG_EN[$MSG_REMOVING_BACKUP_NO_FILE]="RBK0320I: Removing incomplete backup. This may take some time. Please be patient."
 MSG_DE[$MSG_REMOVING_BACKUP_NO_FILE]="RBK0320I: Unvollständiges Backup wird gelöscht. Das kann etwas dauern. Bitte Geduld."
-
+MSG_SAVING_LOG=321
+MSG_EN[$MSG_SAVING_LOG]="RBK0321I: Saving logfile."
+MSG_DE[$MSG_SAVING_LOG]="RBK0321I: Logdatei wird gesichert."
+MSG_ADJUSTING_WARNING_P=322
+MSG_EN[$MSG_ADJUSTING_WARNING_P]="RBK0322W: Target %s with %s is smaller than backup source with %s. Last partition will be truncated accordingly. NOTE: Restore may fail if the root partition will become too small."
+MSG_DE[$MSG_ADJUSTING_WARNING_P]="RBK0322W: Ziel %s mit %s ist kleiner als die Backupquelle mit %s. Die letzte Partition wird entsprechend verkleinert. HINWEIS: Der Restore kann fehlschlagen wenn sie zu klein wird."
+MSG_ADJUSTING_WARNING_P2=323
+MSG_EN[$MSG_ADJUSTING_WARNING_P2]="RBK0323W: Target %s with %s is larger than backup source with %s. Last partition will be expanded accordingly to use the whole space."
+MSG_DE[$MSG_ADJUSTING_WARNING_P2]="RBK0323W: Ziel %s mit %s ist größer als die Backupquelle mit %s. Die letzte Partition wird entsprechend vergrößert um den ganzen Platz zu benutzen."
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -2210,6 +2219,9 @@ function logFinish() {
 	rm -f "$FINISH_LOG_FILE"
 
 	if [[ $LOG_LEVEL != $LOG_NONE ]]; then
+
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_SAVING_LOG 
+
 		# 1) error occured and logoutput is backup location which was deleted or fake mode
 		# 2) fake
 		# 3) backup location was already deleted by SR
@@ -5989,8 +6001,8 @@ function backupRsync() { # partition number (for partition based backup), mountp
 		if (( partitionBackup )); then
 			logItem "Partition backup"
 			partition="${BOOT_PARTITION_PREFIX}$1"
-			target="${BACKUPTARGET_DIR}"
-			source="$TEMPORARY_MOUNTPOINT_ROOT/$partition"
+			target="${BACKUPTARGET_DIR}/$partition"
+			source="$TEMPORARY_MOUNTPOINT_ROOT/$partition/"
 			excludeRoot="/$partition"
 		else
 			logItem "Mountpoint backup"
@@ -6015,15 +6027,19 @@ function backupRsync() { # partition number (for partition based backup), mountp
 		if (( partitionBackup )); then
 			if [[ -d $lastBackupDir/$partition ]]; then
 				lastBackupDir="$lastBackupDir/${partition}"
+			else
+				lastBackupDir=""
 			fi
-		elif (( mountPoints )); then
+		elif [[ -n $MOUNTPOINTS_TO_BACKUP ]]; then
 			if [[ -d $lastBackupDir/$mountpointName ]]; then
 				lastBackupDir="$lastBackupDir/${mountpointName}"
+			else
+				lastBackupDir=""
 			fi
 		fi
 	fi
 
-	logItem "LastBackupDir: $lastBackupDir"
+	logItem "lastBackupDir: $lastBackupDir"
 
 	local LINK_DEST=""
 	if [[ -n $lastBackupDir ]]; then
@@ -6203,7 +6219,7 @@ function formatBackupDevice() {
 
 					if (( sourceSDSize > targetSDSize )); then
 						if (( $RESIZE_ROOTFS )); then
-							writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_WARNING "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
+							writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_WARNING_P "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
 						else
 							writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_DISABLED "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
 							exitError $RC_PARAMETER_ERROR
@@ -6213,7 +6229,7 @@ function formatBackupDevice() {
 							if (( $targetSDSize >= $TWO_TB )); then		# target should have gpt in order to use space > 2TB during expansion
 								writeToConsole $MSG_LEVEL_MINIMAL $MSG_TARGET_REQUIRES_GPT "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)"
 							fi
-							writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_WARNING2 "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
+							writeToConsole $MSG_LEVEL_MINIMAL $MSG_ADJUSTING_WARNING_P2 "$RESTORE_DEVICE" "$(bytesToHuman $targetSDSize)" "$(bytesToHuman $sourceSDSize)"
 						fi
 					fi
 
@@ -7026,7 +7042,7 @@ function collectPartitions() {
 
 	if [[ ${#PARTITIONS_TO_BACKUP[@]} == 0 ]]; then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_NOPARTITIONS_TOBACKUP_FOUND
-		exitError $RC_
+		exitError $RC_NO_PARTITIONS_FOUND
 	fi
 
 	logExit
@@ -7428,6 +7444,46 @@ function doitBackup() {
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MAX_4GB_LIMIT "$BACKUPPATH"
 	fi
 
+	if (( ! $PARTITIONBASED_BACKUP )) && [[ -n $MOUNTPOINTS_TO_BACKUP ]]; then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MOUNTPOINT_BACKUP_REQUIRES_PARTITIONED_BACKUP
+		exitError $RC_PARAMETER_ERROR
+	fi
+
+	if (( $PARTITIONBASED_BACKUP )) && [[ -n $MOUNTPOINTS_TO_BACKUP ]]; then
+
+		local errorFound=0
+		for mountPath in ${MOUNTPOINTS_TO_BACKUP[@]}; do
+
+			if ! grep -Eq "^(/[^/ ]*)+/?$" <<< "$mountPath"; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_INVALID "$mountPath"
+				errorFound=1
+				continue
+			fi
+
+			if grep -Eq "_" <<< "$mountPath"; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_INVALID "$mountPath"
+				errorFound=1
+				continue
+			fi
+
+			if [[ ! -d  $mountPath ]]; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_FOUND "$mountPath"
+				errorFound=1
+				continue
+			fi
+
+			if ! isMounted "$mountPath"; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_MOUNTED "$mountPath"
+				errorFound=1
+				continue
+			fi
+
+		done
+		if (( $errorFound )); then
+			exitError $RC_EXTERNALMOUNT_ERROR
+		fi
+	fi
+
 	if (( ! $EXCLUDE_DD )); then
 
 		if [[ ! -b $BOOT_DEVICENAME ]]; then
@@ -7659,46 +7715,6 @@ function doitBackup() {
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_DEVICEMOUNTED "$BACKUPPATH"
 				exitError $RC_MISC_ERROR
 			fi
-		fi
-	fi
-
-	if (( ! $PARTITIONBASED_BACKUP )) && [[ -n $MOUNTPOINTS_TO_BACKUP ]]; then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_MOUNTPOINT_BACKUP_REQUIRES_PARTITIONED_BACKUP
-		exitError $RC_PARAMETER_ERROR
-	fi
-
-	if (( $PARTITIONBASED_BACKUP )) && [[ -n $MOUNTPOINTS_TO_BACKUP ]]; then
-
-		local errorFound=0
-		for mountPath in ${MOUNTPOINTS_TO_BACKUP[@]}; do
-
-			if ! grep -Eq "^(/[^/ ]*)+/?$" <<< "$mountPath"; then
-				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_INVALID "$mountPath"
-				errorFound=1
-				continue
-			fi
-
-			if grep -Eq "_" <<< "$mountPath"; then
-				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_INVALID "$mountPath"
-				errorFound=1
-				continue
-			fi
-
-			if [[ ! -d  $mountPath ]]; then
-				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_FOUND "$mountPath"
-				errorFound=1
-				continue
-			fi
-
-			if ! isMounted "$mountPath"; then
-				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_MOUNTED "$mountPath"
-				errorFound=1
-				continue
-			fi
-
-		done
-		if (( $errorFound )); then
-			exitError $RC_EXTERNALMOUNT_ERROR
 		fi
 	fi
 
