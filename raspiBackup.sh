@@ -2947,7 +2947,7 @@ function initializeDefaultConfigVariables() {
 	# reboot system at end of backup
 	DEFAULT_REBOOT_SYSTEM=0
 	# Change these options only if you know what you are doing !!!
-	DEFAULT_RSYNC_BACKUP_OPTIONS="-aHAx --delete"
+	DEFAULT_RSYNC_BACKUP_OPTIONS="-aHAx --delete" 						# -a <=> -rlptgoD, H = preserve hardlinks, x = one filesystem, A = preserver ACLs
 	DEFAULT_RSYNC_BACKUP_ADDITIONAL_OPTIONS=""
 	DEFAULT_TAR_BACKUP_OPTIONS="-cpi --one-file-system"
 	DEFAULT_TAR_BACKUP_ADDITIONAL_OPTIONS=""
@@ -8106,8 +8106,11 @@ function restorePartitionBasedBackup() {
 	local partitionsToRestore=(${PARTITIONS_TO_RESTORE[@]})
 	local partitionsRestored=()
 
+	logItem "RESTOREFILE_BACKUP_BOOT_PARTITION_PREFIX: ${RESTOREFILE}${BACKUP_BOOT_PARTITION_PREFIX}"
 	for partitionBackupFile in "${RESTOREFILE}${BACKUP_BOOT_PARTITION_PREFIX}"*; do
-		local partitionNo="$(grep -Eo "[0-9]+$" <<< "$partitionBackupFile")"
+		logItem "partitionBackupFile: $partitionBackupFile"
+		local partitionNo="$(grep -Eo "[0-9]+(\.($BACKUPTYPE_TAR|$BACKUPTYPE_TGZ))?$" <<< "$partitionBackupFile" | sed -E 's/\..+//' )"  # delete trailing .tar or .tgz
+		logItem "Found partition no: $partitionNo"
 		if [[ "${PARTITIONS_TO_RESTORE}" == "$PARTITIONS_TO_BACKUP_ALL" ]] ||  containsElement "$partitionNo" "${partitionsToRestore[@]}"; then
 			restorePartitionBasedPartition "$partitionBackupFile"
 			partitionsRestored+=($partitionNo)
@@ -8147,9 +8150,16 @@ function restorePartitionBasedBackup() {
 		logItem "Encoded dir: $mountpointDir"
 
 		logItem "Checking whether backup $mountpointDir for $mountpoint exists in backup"
-		if [[ ! -d ${RESTOREFILE}/${mountpointDir} ]]; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_MOUNTPOINT_BACKUP_NOTFOUND "$mountpoint" "$RESTOREFILE"
-			exitError $RC_EXTERNALMOUNT_ERROR
+		if [[ $BACKUPTYPE == $BACKUPTYPE_RSYNC ]]; then
+			if [[ ! -d ${RESTOREFILE}/${mountpointDir} ]]; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_MOUNTPOINT_BACKUP_NOTFOUND "$mountpoint" "$RESTOREFILE"
+				exitError $RC_EXTERNALMOUNT_ERROR
+			fi
+		else # tar/tgz
+			if [[ ! -f ${RESTOREFILE}/${mountpointDir}.${BACKUPTYPE} ]]; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_MOUNTPOINT_BACKUP_NOTFOUND "$mountpoint" "$RESTOREFILE"
+				exitError $RC_EXTERNALMOUNT_ERROR
+			fi
 		fi
 
 	done
@@ -8419,7 +8429,13 @@ function restorePartitionBasedMountpoint() { # restorefile mountpoint
 	local mountpoint="$2"
 	local mountpointDir="$(encodeMountpoint $mountpoint)"
 
-	local restoreDir="$1/$mountpointDir"
+	local restoreDir
+
+	if [[ $BACKUPTYPE == $BACKUPTYPE_RSYNC ]]; then
+		restoreDir "$1/$mountpointDir"
+	else #tar/tgz
+		restoreDir="$1/$mountpointDir.${BACKUPTYPE}"
+	fi
 
 	writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORING_MOUNTPOINT "$mountpoint"
 
@@ -8555,8 +8571,7 @@ function restorePartitionBasedPartition() { # restorefile
 					;;
 
 				$BACKUPTYPE_RSYNC)
-					local archiveFlags="aH"						# -a <=> -rlptgoD, H = preserve hardlinks
-					cmdParms="--numeric-ids -${archiveFlags}X$verbose \"$restoreFile/\" $MNT_POINT"
+					cmdParms="--numeric-ids -${DEFAULT_RSYNC_BACKUP_OPTIONS} -X$verbose \"$restoreFile/\" $MNT_POINT"
 					if (( $PROGRESS && $INTERACTIVE )); then
 						cmd="rsync --info=progress2 $cmdParms"
 					else
