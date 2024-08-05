@@ -2026,6 +2026,9 @@ MSG_DE[$MSG_ADJUSTING_WARNING_P2]="RBK0323W: Ziel %s mit %s ist größer als die
 MSG_NOT_ALL_OS_PARTITIONS_SAVED=324
 MSG_EN[$MSG_NOT_ALL_OS_PARTITIONS_SAVED]="RBK0324W: Not all OS partitions saved. Backup will not boot."
 MSG_DE[$MSG_NOT_ALL_OS_PARTITIONS_SAVED]="RBK0324W: Es werden nicht alle OS Partition gesichert und das Backup wird nicht starten."
+MSG_TAR_MOUNTPOINT_BACKUP_NO_SYNC=325
+MSG_EN[$MSG_TAR_MOUNTPOINT_BACKUP_NO_SYNC]="RBK0325W: tar/tgz mountpoint restore does not delete files not included in the backup."
+MSG_DE[$MSG_TAR_MOUNTPOINT_BACKUP_NO_SYNC]="RBK0325W: Beim tar/tgz Mountpoint Restore werden keine Dateien die im Backup nicht mehr existieren nicht gelöscht."
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -8166,6 +8169,10 @@ function restorePartitionBasedBackup() {
 
 	# restore mountpoints
 
+	if (( ${#mountpointsToRestore[@]} > 0 )) && [[ $BACKUPTYPE == $BACKUPTYPE_TAR || $BACKUPTYPE == $BACKUPTYPE_TGZ ]]; then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_TAR_MOUNTPOINT_BACKUP_NO_SYNC
+	fi
+
 	for mountpoint in "${mountpointsToRestore[@]}"; do
 		logItem "Restoring mountpoint $mountpoint"
 		restorePartitionBasedMountpoint "$RESTOREFILE" "$mountpoint"
@@ -8432,7 +8439,7 @@ function restorePartitionBasedMountpoint() { # restorefile mountpoint
 	local restoreDir
 
 	if [[ $BACKUPTYPE == $BACKUPTYPE_RSYNC ]]; then
-		restoreDir "$1/$mountpointDir"
+		restoreDir="$1/$mountpointDir"
 	else #tar/tgz
 		restoreDir="$1/$mountpointDir.${BACKUPTYPE}"
 	fi
