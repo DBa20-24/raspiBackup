@@ -2023,6 +2023,9 @@ MSG_DE[$MSG_ADJUSTING_WARNING_P]="RBK0322W: Ziel %s mit %s ist kleiner als die B
 MSG_ADJUSTING_WARNING_P2=323
 MSG_EN[$MSG_ADJUSTING_WARNING_P2]="RBK0323W: Target %s with %s is larger than backup source with %s. Last partition will be expanded accordingly to use the whole space."
 MSG_DE[$MSG_ADJUSTING_WARNING_P2]="RBK0323W: Ziel %s mit %s ist größer als die Backupquelle mit %s. Die letzte Partition wird entsprechend vergrößert um den ganzen Platz zu benutzen."
+MSG_NOT_ALL_OS_PARTITIONS_SAVED=324
+MSG_EN[$MSG_NOT_ALL_OS_PARTITIONS_SAVED]="RBK0324W: Not all OS partitions saved. Backup will not boot."
+MSG_DE[$MSG_NOT_ALL_OS_PARTITIONS_SAVED]="RBK0324W: Es werden nicht alle OS Partition gesichert und das Backup wird nicht starten."
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -2220,7 +2223,7 @@ function logFinish() {
 
 	if [[ $LOG_LEVEL != $LOG_NONE ]]; then
 
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_SAVING_LOG 
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_SAVING_LOG
 
 		# 1) error occured and logoutput is backup location which was deleted or fake mode
 		# 2) fake
@@ -6786,7 +6789,13 @@ function backupPartitions() {
 
 	logItem "PARTITIONS_TO_BACKUP: $(echo "${PARTITIONS_TO_BACKUP[@]}")"
 
-	writeToConsole $MSG_LEVEL_MINIMAL $MSG_BACKUP_STARTED "$BACKUPTYPE"
+	if (( "${#PARTITIONS_TO_BACKUP[@]}" > 0 )); then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_BACKUP_STARTED "$BACKUPTYPE"
+	fi
+
+	if ! containsElement "1" "${PARTITIONS_TO_BACKUP[@]}" || ! containsElement "2" "${PARTITIONS_TO_BACKUP[@]}"; then
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_NOT_ALL_OS_PARTITIONS_SAVED
+	fi
 
 	if (( ! $FAKE )); then
 		partitionLayoutBackup
@@ -7039,11 +7048,6 @@ function collectPartitions() {
 
 	logItem "PARTITIONS_TO_BACKUP - 2: $(echo "${PARTITIONS_TO_BACKUP[@]}")"
 	logItem "mountPoints: $(echo "${mountPoints[@]}")"
-
-	if [[ ${#PARTITIONS_TO_BACKUP[@]} == 0 ]]; then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_NOPARTITIONS_TOBACKUP_FOUND
-		exitError $RC_NO_PARTITIONS_FOUND
-	fi
 
 	logExit
 
