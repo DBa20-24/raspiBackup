@@ -7998,30 +7998,8 @@ function restorePartitionBasedBackup() {
 
 	local partition sourceSDSize targetSDSize
 
-	if [[ "$BACKUPTYPE" != $BACKUPTYPE_DD && "$BACKUPTYPE" != $BACKUPTYPE_DDZ ]]; then
-		if [[ ! -e "$SF_FILE" ]]; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_FILE_NOT_FOUND "$SF_FILE"
-			exitError $RC_MISSING_FILES
-		fi
-		logItem "SF_FILE: $SF_FILE$NL$(<"$SF_FILE")"
-		if [[ ! -e "$MBR_FILE" ]]; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_FILE_NOT_FOUND "$MBR_FILE"
-			exitError $RC_MISSING_FILES
-		fi
-		if [[ ! -e "$BLKID_FILE" ]]; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_FILE_NOT_FOUND "$BLKID_FILE"
-			exitError $RC_MISSING_FILES
-		fi
-		logItem "BLKID_FILE: $BLKID_FILE$NL$(<"$BLKID_FILE")"
-		if [[ ! -e "$PARTED_FILE" ]]; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_FILE_NOT_FOUND "$PARTED_FILE"
-			exitError $RC_MISSING_FILES
-		fi
-		logItem "PARTED_FILE: $PARTED_FILE$NL$(<"$PARTED_FILE")"
-		if [[ -n $ROOT_PARTITION ]]; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORE_DEVICE_NOT_ALLOWED
-			exitError $RC_MISSING_FILES
-		fi
+	if [[ "${RESTOREFILE: -1}" != "/" ]]; then
+		RESTOREFILE="$RESTOREFILE/"
 	fi
 
 	if mount | grep -q $RESTORE_DEVICE; then
@@ -8086,10 +8064,6 @@ function restorePartitionBasedBackup() {
 	initRestoreVariables
 	formatBackupDevice
 
-	if [[ "${RESTOREFILE: -1}" != "/" ]]; then
-		RESTOREFILE="$RESTOREFILE/"
-	fi
-
 	MNT_POINT="$TEMPORARY_MOUNTPOINT_ROOT"
 
 	if isMounted "$MNT_POINT"; then
@@ -8105,80 +8079,109 @@ function restorePartitionBasedBackup() {
 
 	# handle partitions
 
-	local partitionBackupFile
 	local partitionsToRestore=(${PARTITIONS_TO_RESTORE[@]})
-	local partitionsRestored=()
 
-	logItem "RESTOREFILE_BACKUP_BOOT_PARTITION_PREFIX: ${RESTOREFILE}${BACKUP_BOOT_PARTITION_PREFIX}"
-	for partitionBackupFile in "${RESTOREFILE}${BACKUP_BOOT_PARTITION_PREFIX}"*; do
-		logItem "partitionBackupFile: $partitionBackupFile"
-		local partitionNo="$(grep -Eo "[0-9]+(\.($BACKUPTYPE_TAR|$BACKUPTYPE_TGZ))?$" <<< "$partitionBackupFile" | sed -E 's/\..+//' )"  # delete trailing .tar or .tgz
-		logItem "Found partition no: $partitionNo"
-		if [[ "${PARTITIONS_TO_RESTORE}" == "$PARTITIONS_TO_BACKUP_ALL" ]] ||  containsElement "$partitionNo" "${partitionsToRestore[@]}"; then
-			restorePartitionBasedPartition "$partitionBackupFile"
-			partitionsRestored+=($partitionNo)
-		else
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_SKIP_PARTITION_RESTORE "$partitionNo" "$RESTORE_DEVICE"
+	if (( ${#partitionsToRestore[@]} > 0 )); then
+		if [[ ! -e "$SF_FILE" ]]; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_FILE_NOT_FOUND "$SF_FILE"
+			exitError $RC_MISSING_FILES
 		fi
-	done
+		logItem "SF_FILE: $SF_FILE$NL$(<"$SF_FILE")"
+		if [[ ! -e "$MBR_FILE" ]]; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_FILE_NOT_FOUND "$MBR_FILE"
+			exitError $RC_MISSING_FILES
+		fi
+		if [[ ! -e "$BLKID_FILE" ]]; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_FILE_NOT_FOUND "$BLKID_FILE"
+			exitError $RC_MISSING_FILES
+		fi
+		logItem "BLKID_FILE: $BLKID_FILE$NL$(<"$BLKID_FILE")"
+		if [[ ! -e "$PARTED_FILE" ]]; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_FILE_NOT_FOUND "$PARTED_FILE"
+			exitError $RC_MISSING_FILES
+		fi
+		logItem "PARTED_FILE: $PARTED_FILE$NL$(<"$PARTED_FILE")"
+	
+		local partitionBackupFile
+		local partitionsToRestore=(${PARTITIONS_TO_RESTORE[@]})
+		local partitionsRestored=()
 
-	if ! containsElement "1" "${partitionsRestored[@]}" || ! containsElement "2" "${partitionsRestored[@]}"; then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_PARTITION_RESTORE_NO_BOOT_POSSIBLE
+		logItem "RESTOREFILE_BACKUP_BOOT_PARTITION_PREFIX: ${RESTOREFILE}${BACKUP_BOOT_PARTITION_PREFIX}"
+		for partitionBackupFile in "${RESTOREFILE}${BACKUP_BOOT_PARTITION_PREFIX}"*; do
+			logItem "partitionBackupFile: $partitionBackupFile"
+			local partitionNo="$(grep -Eo "[0-9]+(\.($BACKUPTYPE_TAR|$BACKUPTYPE_TGZ))?$" <<< "$partitionBackupFile" | sed -E 's/\..+//' )"  # delete trailing .tar or .tgz
+			logItem "Found partition no: $partitionNo"
+			if [[ "${PARTITIONS_TO_RESTORE}" == "$PARTITIONS_TO_BACKUP_ALL" ]] ||  containsElement "$partitionNo" "${partitionsToRestore[@]}"; then
+				restorePartitionBasedPartition "$partitionBackupFile"
+				partitionsRestored+=($partitionNo)
+			else
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_SKIP_PARTITION_RESTORE "$partitionNo" "$RESTORE_DEVICE"
+			fi
+		done
+
+		if ! containsElement "1" "${partitionsRestored[@]}" || ! containsElement "2" "${partitionsRestored[@]}"; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_PARTITION_RESTORE_NO_BOOT_POSSIBLE
+		fi
+
+		updateUUIDs
+
 	fi
 
 	# handle external mountpoints
 
-	local mountpoint
 	local mountpointsToRestore=(${MOUNTPOINTS_TO_RESTORE[@]})
 
-	logItem "Mountpoints to restore: ${mountpointsToRestore[@]}"
+	if (( ${#mountpointsToRestore[@]} > 0 )); then
 
-	# check if there exist backups for mountpoints
+		local mountpoint
 
-	for mountpoint in "${mountpointsToRestore[@]}"; do
-		logItem "Checking mountpoint $mountpoint"
-		if [[ ! -d $mountpoint ]]; then
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_FOUND $mountpoint
-			exitError $RC_EXTERNALMOUNT_ERROR
-		fi
+		logItem "Mountpoints to restore: ${mountpointsToRestore[@]}"
 
-		logItem "Checking whether mountpoint $mountpoint has mounted partition"
-		if ! isMounted $mountpoint; then
+		# check if there exist backups for mountpoints
+
+		for mountpoint in "${mountpointsToRestore[@]}"; do
 			logItem "Checking mountpoint $mountpoint"
-			writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_MOUNTED $mountpoint
-			exitError $RC_EXTERNALMOUNT_ERROR
-		fi
-
-		local mountpointDir="$(encodeMountpoint $mountpoint)"
-		logItem "Encoded dir: $mountpointDir"
-
-		logItem "Checking whether backup $mountpointDir for $mountpoint exists in backup"
-		if [[ $BACKUPTYPE == $BACKUPTYPE_RSYNC ]]; then
-			if [[ ! -d ${RESTOREFILE}/${mountpointDir} ]]; then
-				writeToConsole $MSG_LEVEL_MINIMAL $MSG_MOUNTPOINT_BACKUP_NOTFOUND "$mountpoint" "$RESTOREFILE"
+			if [[ ! -d $mountpoint ]]; then
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_FOUND $mountpoint
 				exitError $RC_EXTERNALMOUNT_ERROR
 			fi
-		else # tar/tgz
-			if [[ ! -f ${RESTOREFILE}/${mountpointDir}.${BACKUPTYPE} ]]; then
-				writeToConsole $MSG_LEVEL_MINIMAL $MSG_MOUNTPOINT_BACKUP_NOTFOUND "$mountpoint" "$RESTOREFILE"
+
+			logItem "Checking whether mountpoint $mountpoint has mounted partition"
+			if ! isMounted $mountpoint; then
+				logItem "Checking mountpoint $mountpoint"
+				writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTERNAL_MOUNT_NOT_MOUNTED $mountpoint
 				exitError $RC_EXTERNALMOUNT_ERROR
 			fi
+
+			local mountpointDir="$(encodeMountpoint $mountpoint)"
+			logItem "Encoded dir: $mountpointDir"
+
+			logItem "Checking whether backup $mountpointDir for $mountpoint exists in backup"
+			if [[ $BACKUPTYPE == $BACKUPTYPE_RSYNC ]]; then
+				if [[ ! -d ${RESTOREFILE}/${mountpointDir} ]]; then
+					writeToConsole $MSG_LEVEL_MINIMAL $MSG_MOUNTPOINT_BACKUP_NOTFOUND "$mountpoint" "$RESTOREFILE"
+					exitError $RC_EXTERNALMOUNT_ERROR
+				fi
+			else # tar/tgz
+				if [[ ! -f ${RESTOREFILE}/${mountpointDir}.${BACKUPTYPE} ]]; then
+					writeToConsole $MSG_LEVEL_MINIMAL $MSG_MOUNTPOINT_BACKUP_NOTFOUND "$mountpoint" "$RESTOREFILE"
+					exitError $RC_EXTERNALMOUNT_ERROR
+				fi
+			fi
+
+		done
+
+		# restore mountpoints
+
+		if (( ${#mountpointsToRestore[@]} > 0 )) && [[ $BACKUPTYPE == $BACKUPTYPE_TAR || $BACKUPTYPE == $BACKUPTYPE_TGZ ]]; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_TAR_MOUNTPOINT_BACKUP_NO_SYNC
 		fi
 
-	done
-
-	# restore mountpoints
-
-	if (( ${#mountpointsToRestore[@]} > 0 )) && [[ $BACKUPTYPE == $BACKUPTYPE_TAR || $BACKUPTYPE == $BACKUPTYPE_TGZ ]]; then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_TAR_MOUNTPOINT_BACKUP_NO_SYNC
+		for mountpoint in "${mountpointsToRestore[@]}"; do
+			logItem "Restoring mountpoint $mountpoint"
+			restorePartitionBasedMountpoint "$RESTOREFILE" "$mountpoint"
+		done
 	fi
-
-	for mountpoint in "${mountpointsToRestore[@]}"; do
-		logItem "Restoring mountpoint $mountpoint"
-		restorePartitionBasedMountpoint "$RESTOREFILE" "$mountpoint"
-	done
-
-	updateUUIDs
 
 	logCommand "fdisk -l $RESTORE_DEVICE"
 
@@ -8474,8 +8477,7 @@ function restorePartitionBasedMountpoint() { # restorefile mountpoint
 			;;
 
 		$BACKUPTYPE_RSYNC)
-			local archiveFlags="aH"						# -a <=> -rlptgoD, H = preserve hardlinks
-			cmdParms="--numeric-ids -${archiveFlags}X$verbose \"$restoreDir/\" $mountpoint"
+			cmdParms="--numeric-ids $RSYNC_BACKUP_OPTIONS -X$verbose \"$restoreDir/\" $mountpoint"
 			if (( $PROGRESS && $INTERACTIVE )); then
 				cmd="rsync --info=progress2 $cmdParms"
 			else
@@ -8578,7 +8580,7 @@ function restorePartitionBasedPartition() { # restorefile
 					;;
 
 				$BACKUPTYPE_RSYNC)
-					cmdParms="--numeric-ids -${DEFAULT_RSYNC_BACKUP_OPTIONS} -X$verbose \"$restoreFile/\" $MNT_POINT"
+					cmdParms="--numeric-ids ${DEFAULT_RSYNC_BACKUP_OPTIONS} -X$verbose \"$restoreFile/\" $MNT_POINT"
 					if (( $PROGRESS && $INTERACTIVE )); then
 						cmd="rsync --info=progress2 $cmdParms"
 					else
@@ -8674,7 +8676,7 @@ function doitRestore() {
 	logItem "Checking for partitionbasedbackup in $RESTOREFILE/*"
 	logCommand "ls -1 $RESTOREFILE*"
 
-	if  ls -1 "$RESTOREFILE"* | egrep "^(sd[a-z]([0-9]+)|mmcblk[0-9]+p[0-9]+|nvme[0-9]+n[0-9]+p[0-9]+)(\.(tar|tgz))?$" &>>"$LOG_FILE" ; then
+	if  ls -1 "$RESTOREFILE"* | egrep "\.blkid$" &>>"$LOG_FILE" ; then
 		PARTITIONBASED_BACKUP=1
 	else
 		PARTITIONBASED_BACKUP=0
