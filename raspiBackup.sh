@@ -6925,6 +6925,11 @@ function doit() {
 
 }
 
+function partitionsSelected() {
+	[[ ! "$PARTITIONS_TO_BACKUP" =~ ^[[:space:]]*$ ]] ||  [[ ! "$PARTITIONS_TO_RESTORE" =~ ^[[:space:]]*$ ]]
+}
+
+
 # blkid
 # /dev/mmcblk0p2: UUID="ea98d3bf-9345-4bd7-b365-5cc7c543079f" TYPE="ext4" PARTUUID="d888a167-02"
 
@@ -7951,6 +7956,7 @@ function restoreNonPartitionBasedBackup() {
 		current_partition_table="$(listDeviceInfo $RESTORE_DEVICE)"
 		if [[ -n $current_partition_table ]]; then
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$RESTORE_DEVICE"
+			logItem "$current_partition_table"
 			echo "$current_partition_table"
 		else
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_PARTITION_TABLE_DEFINED "$RESTORE_DEVICE"
@@ -7966,6 +7972,7 @@ function restoreNonPartitionBasedBackup() {
 			current_partition_table="$(listDeviceInfo $ROOT_DEVICE)"
 			if [[ -n $current_partition_table ]]; then
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$ROOT_DEVICE"
+				logItem "$current_partition_table"
 				echo "$current_partition_table"
 			else
 				writeToConsole $MSG_LEVEL_MINIMAL $MSG_NO_PARTITION_TABLE_DEFINED "$ROOT_DEVICE"
@@ -8010,18 +8017,21 @@ function restorePartitionBasedBackup() {
 		logItem "$(mount | grep $RESTORE_DEVICE)"
 	fi
 
-	current_partition_table="$(listDeviceInfo $RESTORE_DEVICE)"
-	writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$RESTORE_DEVICE"
-	echo "$current_partition_table"
-	writeToConsole $MSG_LEVEL_MINIMAL $MSG_WARN_RESTORE_PARTITION_DEVICE_OVERWRITTEN "$RESTORE_DEVICE"
+	if partitionsSelected; then
+		current_partition_table="$(listDeviceInfo $RESTORE_DEVICE)"
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$RESTORE_DEVICE"
+		logItem "$current_partition_table"
+		echo "$current_partition_table"
+		writeToConsole $MSG_LEVEL_MINIMAL $MSG_WARN_RESTORE_PARTITION_DEVICE_OVERWRITTEN "$RESTORE_DEVICE"
 
-	if ! askYesNo; then
-		writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORE_ABORTED
-		exitError $RC_RESTORE_FAILED
-	fi
+		if ! askYesNo; then
+			writeToConsole $MSG_LEVEL_MINIMAL $MSG_RESTORE_ABORTED
+			exitError $RC_RESTORE_FAILED
+		fi
 
-	if (( $NO_YES_QUESTION )); then
-		echo "Y${NL}"
+		if (( $NO_YES_QUESTION )); then
+			echo "Y${NL}"
+		fi
 	fi
 
 	if (( PARTITIONBASED_BACKUP )); then
@@ -8062,7 +8072,9 @@ function restorePartitionBasedBackup() {
 	fi
 
 	initRestoreVariables
-	formatBackupDevice
+	if partitionsSelected; then		# don't format if no partition should be restored
+		formatBackupDevice
+	fi
 
 	MNT_POINT="$TEMPORARY_MOUNTPOINT_ROOT"
 
@@ -8124,6 +8136,7 @@ function restorePartitionBasedBackup() {
 		fi
 
 		updateUUIDs
+		synchronizeCmdlineAndfstab
 
 	fi
 
@@ -8849,7 +8862,6 @@ function doitRestore() {
 		fi
 	else
 		restorePartitionBasedBackup
-		synchronizeCmdlineAndfstab
 	fi
 
 	logCommand "blkid"
