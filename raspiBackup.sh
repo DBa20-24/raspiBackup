@@ -2950,7 +2950,7 @@ function initializeDefaultConfigVariables() {
 	# reboot system at end of backup
 	DEFAULT_REBOOT_SYSTEM=0
 	# Change these options only if you know what you are doing !!!
-	DEFAULT_RSYNC_BACKUP_OPTIONS="-aHAx --delete" 						# -a <=> -rlptgoD, H = preserve hardlinks, x = one filesystem, A = preserver ACLs
+	DEFAULT_RSYNC_BACKUP_OPTIONS="-aHAx --delete --force --sparse --delete-excluded" 						# -a <=> -rlptgoD, H = preserve hardlinks, x = one filesystem, A = preserver ACLs
 	DEFAULT_RSYNC_BACKUP_ADDITIONAL_OPTIONS=""
 	DEFAULT_TAR_BACKUP_OPTIONS="-cpi --one-file-system"
 	DEFAULT_TAR_BACKUP_ADDITIONAL_OPTIONS=""
