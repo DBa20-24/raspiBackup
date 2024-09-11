@@ -6172,7 +6172,7 @@ function logSystemDiskState() {
 	logExit
 }
 
-function formatBackupDevice() {
+function formatRestoreDevice() {
 
 	logEntry
 
@@ -6382,7 +6382,7 @@ function restoreNormalBackupType() {
 				exitError $RC_MISC_ERROR
 			fi
 
-			formatBackupDevice
+			formatRestoreDevice
 
 			if [[ -e $TAR_FILE ]]; then
 				writeToConsole $MSG_LEVEL_DETAILED $MSG_FORMATTING_FIRST_PARTITION "$BOOT_PARTITION"
@@ -8073,7 +8073,7 @@ function restorePartitionBasedBackup() {
 
 	initRestoreVariables
 	if partitionsSelected; then		# don't format if no partition should be restored
-		formatBackupDevice
+		formatRestoreDevice
 	fi
 
 	MNT_POINT="$TEMPORARY_MOUNTPOINT_ROOT"
