@@ -6926,7 +6926,12 @@ function doit() {
 }
 
 function partitionsSelected() {
+	logEntry
+	local rc
 	[[ ! "$PARTITIONS_TO_BACKUP" =~ ^[[:space:]]*$ ]] ||  [[ ! "$PARTITIONS_TO_RESTORE" =~ ^[[:space:]]*$ ]]
+	rc=$?
+	logExit $rc
+	return $rc
 }
 
 
@@ -8131,12 +8136,13 @@ function restorePartitionBasedBackup() {
 			fi
 		done
 
+		updateUUIDs
+
 		if ! containsElement "1" "${partitionsRestored[@]}" || ! containsElement "2" "${partitionsRestored[@]}"; then
 			writeToConsole $MSG_LEVEL_MINIMAL $MSG_PARTITION_RESTORE_NO_BOOT_POSSIBLE
+		else
+			synchronizeCmdlineAndfstab
 		fi
-
-		updateUUIDs
-		synchronizeCmdlineAndfstab
 
 	fi
 

@@ -1,17 +1,40 @@
 #!/bin/bash
 #
-./setupMounts4Backup.sh
+#
+source ./setupMounts4Backup.sh
 
-#sudo ./raspiBackup.sh -M "PlainBackup" --ignoreAdditionalPartitions
+# Create backup with all existing partitions (1,2 and 5)
+sudo ./raspiBackup.sh -M '1' -X "/ext1" -P -T "*"
 
-#sudo ./raspiBackup.sh -M '\-P -T "*" -X "ext1' -X "/ext1" -P -T "*"
+source ./setupMounts4Restore.sh
 
-#sudo ./raspiBackup.sh -M '\-P "1" -X "/ext1"' -X "/ext1" -P -T "1"
+buDir=$(ls -d1 ${BACKUP_PATH}/${BACKUP_DIR}/${BACKUP_DIR}*_1 | tail -1)
+sudo ./raspiBackup.sh -d $RESTORE_SD -Y -T "*" -X "/ext1" $buDir
+checkPartitionDataExists 1 2 5
+checkExtPartitionDataExists 1 
 
-# sudo ./raspiBackup.sh -M '\-T "1 2" -X "/ext1 /ext2"' -P -T "1 2" -X "/ext1 /ext2" 
+exit
+#sudo ./raspiBackup.sh -d $RESTORE_SD -Y -T "1" -X "/ext1 /ext2" ${BACKUP_PATH}/${BACKUP_DIR}/${BACKUP_DIR}*_2 
+#checkPartitionDataExists 1 
 
-sudo ./raspiBackup.sh -M '\-T "1" -X "/ext1 /ext2"' -P -T "1" -X "/ext1 /ext2" 
 
-#sudo ./raspiBackup.sh -M '\-T "5" -X "/ext1 /ext2' -X "/ext1 /ext2" -P -T "5"
+# Create backup with first partition only
+sudo ./raspiBackup.sh -M '2' -X "/ext1" -P -T "1"
+
+# Create backup with OS partitions only
+sudo ./raspiBackup.sh -M '3' -P -T "1 2" -X "/ext1 /ext2" 
+
+# Create backup with 5th partition only
+sudo ./raspiBackup.sh -M '5' -X "/ext1 /ext2" -P -T "5"
+
+
+
+
+
+
+
+
+
+
 
 
