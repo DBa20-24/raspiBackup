@@ -6172,11 +6172,11 @@ function logSystemDiskState() {
 	logExit
 }
 
-function formatRestoreDevice() {
+function partitionRestoreDevice() {
 
 	logEntry
 
-	if (( $SKIP_SFDISK )); then
+	if (( $SKIP_SFDISK )) || ! arePartitionsSelected; then
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_SKIP_CREATING_PARTITIONS
 
 	elif [[ $BACKUPTYPE != $BACKUPTYPE_DD && $BACKUPTYPE != $BACKUPTYPE_DDZ ]]; then
@@ -6382,7 +6382,7 @@ function restoreNormalBackupType() {
 				exitError $RC_MISC_ERROR
 			fi
 
-			formatRestoreDevice
+			partitionRestoreDevice
 
 			if [[ -e $TAR_FILE ]]; then
 				writeToConsole $MSG_LEVEL_DETAILED $MSG_FORMATTING_FIRST_PARTITION "$BOOT_PARTITION"
@@ -6925,7 +6925,7 @@ function doit() {
 
 }
 
-function partitionsSelected() {
+function arePartitionsSelected() {
 	logEntry
 	local rc
 	[[ ! "$PARTITIONS_TO_BACKUP" =~ ^[[:space:]]*$ ]] ||  [[ ! "$PARTITIONS_TO_RESTORE" =~ ^[[:space:]]*$ ]]
@@ -8022,7 +8022,7 @@ function restorePartitionBasedBackup() {
 		logItem "$(mount | grep $RESTORE_DEVICE)"
 	fi
 
-	if partitionsSelected; then
+	if arePartitionsSelected; then
 		current_partition_table="$(listDeviceInfo $RESTORE_DEVICE)"
 		writeToConsole $MSG_LEVEL_MINIMAL $MSG_CURRENT_PARTITION_TABLE "$RESTORE_DEVICE"
 		logItem "$current_partition_table"
@@ -8077,9 +8077,7 @@ function restorePartitionBasedBackup() {
 	fi
 
 	initRestoreVariables
-	if partitionsSelected; then		# don't format if no partition should be restored
-		formatRestoreDevice
-	fi
+	partitionRestoreDevice
 
 	MNT_POINT="$TEMPORARY_MOUNTPOINT_ROOT"
 
