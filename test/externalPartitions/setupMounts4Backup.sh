@@ -2,6 +2,7 @@
 
 source ./setupMounts4.inc
 
+rm $LOG_FILE 2>/dev/null || true
 sudo umount /backup
 sudo mount $BACKUP_PART /backup
 
