@@ -2,14 +2,15 @@
 
 source ./setupMounts4.inc
 
-sudo umount /backup
-sudo mount $BACKUP_PART /backup
+sudo umount $BACKUP_PATH
+sudo mount $BACKUP_PART $BACKUP_PATH
 
 unbindAll
-sudo mount --bind /backup/restore/extMount1 /ext1
-sudo mount --bind /backup/restore/extMount2 /ext2
-sudo rm -rf /ext1/*
-sudo rm -rf /ext2/*
+sudo mount --bind $EXTPART1_RESTORE_PATH $EXTPART_MP1
+sudo mount --bind $EXTPART2_RESTORE_PATH $EXTPART_MP2
+
+sudo rm -rf $EXTPART_MP1/*
+sudo rm -rf $EXTPART_MP2/*
 
 #findmnt
 

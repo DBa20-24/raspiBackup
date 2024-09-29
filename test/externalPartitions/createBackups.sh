@@ -9,7 +9,7 @@ buDir=""
 sourceUUID=""
 
 function exited() {
-	sudo umount /mnt
+	sudo umount /mnt 2>/dev/null
 }	
 
 function err() {
@@ -23,17 +23,24 @@ function err() {
 }
 
 function header() {
-	echo "############################################"
+	echo "########################################################################################"
 	echo "$1"
-	echo "############################################"
+	echo "########################################################################################"
 }	
+
+function info() {
+	echo "---> $1"
+}
 
 source ./setupMounts4Backup.sh
 TC="125_12"
-:<<SKIP
-#header "Create backup of partition 1 2 and 5 and ext partition 1 and 2"
-#sudo ./raspiBackup.sh -M "$TC" -X "/ext1 /ext2" -P -T "1 2 5"
 
+:<<SKIP
+header "Create backup of partition 1 2 and 5 and ext partition 1 and 2"
+sudo ./raspiBackup.sh -M "$TC" -X "/ext1 /ext2" -P -T "1 2 5" >> $LOG_FILE 
+SKIP
+
+:<<SKIP
 header "restore all partitions and external paritions with repartitioning"
 source ./setupMounts4Restore.sh
 sourceUUID=$(getUUID)
@@ -52,6 +59,7 @@ fi
 set +e
 SKIP
 
+:<<SKIP
 header "restore partition 1 with repartitioning"
 source ./setupMounts4Restore.sh
 sourceUUID=$(getUUID)
@@ -73,16 +81,18 @@ if compareUUID $sourceUUID; then
 	exit
 fi	
 set +e
+SKIP
 
+:<<SKIP
 header "restore first partition without repartitioning"
 source ./setupMounts4Restore.sh
 sourceUUID=$(getUUID)
 buDir=$(ls -d1 ${BACKUP_PATH}/${BACKUP_DIR}/${BACKUP_DIR}*_$TC | tail -1)
 # remove one file and add a new file 
 sudo mount ${RESTORE_SD}1 /mnt
-#sudo rm /mnt/cmdline.txt
+sudo rm /mnt/cmdline.txt
 sudo touch /mnt/dummy.txt
-echo "Dummy" | sudo tee /mnt/issuee.txt > /dev/null
+echo "Dummy" | sudo tee /mnt/issue.txt > /dev/null
 sudo umount /mnt 
 # restore backup and repartition
 sudo ./raspiBackup.sh -d $RESTORE_SD -Y -T "1" -0 $buDir >> $LOG_FILE 
@@ -113,7 +123,44 @@ if grep "Dummy" /mnt/issue.txt; then
 	exit
 fi	
 set +e
+SKIP
 
+header "restore external partitions only"
+source ./setupMounts4Restore.sh
+sourceUUID=$(getUUID)
+buDir=$(ls -d1 ${BACKUP_PATH}/${BACKUP_DIR}/${BACKUP_DIR}*_$TC | tail -1)
+info "restore backup and repartition and keep UUIDs"
+sudo ./raspiBackup.sh -d $RESTORE_SD -Y -X "/ext1 /ext2" --updateUUIDs- -T "1" $buDir >> $LOG_FILE
+info "remove one file and add a new file and modify one file"
+sudo rm $EXTPART1_RESTORE_FILE
+sudo touch $EXTPART1_RESTORE_PATH/dummy.txt
+echo "Dummy" | sudo tee $EXTPART2_RESTORE_FILE > /dev/null
+
+info "now restore external partitions only"
+sudo ./raspiBackup.sh -d $RESTORE_SD -Y -T " " -X "/ext1 /ext2" $buDir >> $LOG_FILE 
+set -e
+checkExtPartitionDataExists 1 2 
+if ! compareUUID $sourceUUID; then
+	echo "??? Repartitioning happend"
+	exit
+fi	
+echo "Testing for $EXTPART1_RESTORE_FILE exists"
+if [[ ! -e $EXTPART1_RESTORE_FILE ]]; then
+	echo "$EXTPART1_RESTORE_FILE not restored"
+	exit
+fi	
+
+echo "Testing for dummy.txt deleted"
+if [[ -e $EXTPART1_RESTORE_PATH/dummy.txt ]]; then
+	echo "$EXTPART1_RESTORE_PATH/dummy.txt not deleted"
+	exit
+fi	
+
+echo "Testing for $EXTPART2_RESTORE_FILE restored"
+if ! grep -q "$EXTPART2_FILE_CONTENTS" $EXTPART2_RESTORE_FILE; then
+	echo "$EXTPART2_RESTORE_FILE not restored"
+	exit
+fi	
 
 echo ":-) Test finished"
 

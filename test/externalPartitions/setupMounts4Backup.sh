@@ -3,14 +3,17 @@
 source ./setupMounts4.inc
 
 rm $LOG_FILE 2>/dev/null || true
-sudo umount /backup
-sudo mount $BACKUP_PART /backup
+sudo umount $BACKUP_PATH
+sudo mount $BACKUP_PART $BACKUP_PATH
 
 unbindAll
-sudo mount --bind /backup/backup/extMount1 /ext1
-sudo mount --bind /backup/backup/extMount2 /ext2
+sudo mount --bind $EXTPART1_BACKUP_PATH $EXTPART_MP1
+sudo mount --bind $EXTPART2_BACKUP_PATH $EXTPART_MP2
 
-#findmnt
-	
+sudo rm -rf $EXTPART_MP1/*
+sudo rm -rf $EXTPART_MP2/*
+
+echo "$EXTPART1_FILE_CONTENTS" | sudo tee $EXTPART1_BACKUP_FILE > /dev/null
+echo "$EXTPART2_FILE_CONTENTS" | sudo tee $EXTPART2_BACKUP_FILE > /dev/null
 
 
