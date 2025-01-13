@@ -2065,6 +2065,10 @@ MSG_NO_BOOTPARTITION_MOUNTED=344
 MSG_EN[$MSG_NO_BOOTPARTITION_MOUNTED]="RBK0344E: No mounted boot parition detected"
 # shellcheck disable=SC2034
 MSG_DE[$MSG_NO_BOOTPARTITION_MOUNTED]="RBK0344E: Keine gemountete Bootpartition gefunden"
+MSG_EXTRA_MOUNT_OPTS=345
+MSG_EN[$MSG_EXTRA_MOUNT_OPTS]="RBK0341I: Mount options for %s: %s"
+MSG_DE[$MSG_EXTRA_MOUNT_OPTS]="RBK0341I: Mount Optionen für %s: %s"
+
 
 declare -A MSG_HEADER=( ['I']="---" ['W']="!!!" ['E']="???" )
 
@@ -2918,6 +2922,7 @@ function logOptions() { # option state
 	logItem "VERBOSE=$VERBOSE"
 	logItem "YES_NO_RESTORE_DEVICE=$YES_NO_RESTORE_DEVICE"
 	logItem "ZIP_BACKUP=$ZIP_BACKUP"
+ 	logItem "USE_FS_SNAPSHOTS=$USE_FS_SNAPSHOTS"
 
 	logExit
 
@@ -3086,6 +3091,8 @@ function initializeDefaultConfigVariables() {
 	DEFAULT_BOOT_DEVICE=""
 	# How often inform about possible old-named backups
 	DEFAULT_OLD_REMINDER_REPEAT="5"
+	# Use native filesystem snapshots
+        DEFAULT_USE_FS_SNAPSHOTS="0"
 	############# End default config section #############
 }
 
@@ -3172,6 +3179,7 @@ function copyDefaultConfigVariables() {
 	YES_NO_RESTORE_DEVICE="$DEFAULT_YES_NO_RESTORE_DEVICE"
 	ZIP_BACKUP="$DEFAULT_ZIP_BACKUP"
 	DYNAMIC_MOUNT="$DEFAULT_DYNAMIC_MOUNT"
+ 	USE_FS_SNAPSHOTS="$DEFAULT_USE_FS_SNAPSHOTS"
 
 	checkImportantParameters
 
@@ -9163,6 +9171,17 @@ function updateRestoreReminder() {
 
 }
 
+function extraMountOptions() { # devid
+        FSTYPE=$(findmnt -n -o FSTYPE "$1" || echo "none" )
+        if [ $FSTYPE != "btrfs" ] ; then
+                echo ""
+                logExit
+        else
+                echo "-o ro,subvol=/.snapshot-raspiBackup"
+        fi
+}
+
+
 function mountAndCheck() { # device mountpoint
 	logEntry "$1 - $2"
 	if ( isMounted "$2" ); then
@@ -9174,6 +9193,13 @@ function mountAndCheck() { # device mountpoint
 			exitError $RC_MISC_ERROR
 		fi
 	fi
+        if [ -n "$USE_FS_SNAPSHOTS" ]; then
+                mountOpts=$(extraMountOptions "$1")
+                writeToConsole $MSG_LEVEL_MINIMAL $MSG_EXTRA_MOUNT_OPTS "$1" "$mountOpts"
+        else
+                mountOpts=""
+        fi
+
 	mount "$1" "$2" &>>"$LOG_FILE"
 	local rc=$?
 	if (( $rc )); then
@@ -9883,6 +9909,9 @@ function usageEN() {
 	echo "-t {backupType} ($ALLOWED_TYPES) (Default: $DEFAULT_BACKUPTYPE)"
 	echo "-T {List of partitions to backup in partition oriented mode} (Partition numbers, e.g. \"1 2 3\" or \"*\" for all) (Default: ${DEFAULT_PARTITIONS_TO_BACKUP})"
 	echo "-z compress DD and TAR backup file with gzip (Default: ${NO_YES[$DEFAULT_ZIP_BACKUP]})"
+ 	echo "--snapshots Use filesystem-native snapshots (currently, only btrfs supported, default: $DEFAULT_USE_FS_SNAPSHOTS;"
+  	echo "             before turning this on, make sure a suitable snapshot is created in pre-script or in stop services;"
+   	echo "             the snapshot must be in /.snapshot-raspiBackup)"
 	echo ""
 	echo "-Restore options-"
 	echo "-0 Restore device will not be partitioned"
